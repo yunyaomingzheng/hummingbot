@@ -146,6 +146,7 @@ cdef class MexcExchange(ExchangeBase):
         self._tx_tracker = MexcExchangeTransactionTracker(self)
         self._user_stream_tracker = MexcUserStreamTracker(mexc_auth=self._mexc_auth,
                                                           trading_pairs=trading_pairs)
+        MexcAPIOrderBookDataSource.api_key = mexc_api_key
 
     @property
     def name(self) -> str:
@@ -208,6 +209,7 @@ cdef class MexcExchange(ExchangeBase):
         self._async_scheduler.stop()
 
     async def start_network(self):
+        print("start_network")
         self._stop_network()
         self._order_book_tracker.start()
         self._trading_rules_polling_task = safe_ensure_future(self._trading_rules_polling_loop())
@@ -291,7 +293,7 @@ cdef class MexcExchange(ExchangeBase):
             headers=headers,
             params=params if params else None,
             data=text_data,
-            proxy="http://127.0.0.1:1087",
+            # proxy="http://127.0.0.1:1087",
             ssl_context=ssl_context
         )
 
@@ -316,16 +318,21 @@ cdef class MexcExchange(ExchangeBase):
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
         print("msg:" + str(msg))
         if msg['code'] == 200:
-            balance = msg['data']
+            balances = msg['data']
         else:
             raise Exception(msg)
 
         self._account_available_balances.clear()
         self._account_balances.clear()
-
+        print()
         for k, balance in balances.items():
-            self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
-            self._account_available_balances[k] = Decimal(balance['available'])
+            print(k,balance)
+            if Decimal(balance['frozen']) + Decimal(balance['available']) > Decimal(0.001):
+                self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
+                self._account_available_balances[k] = Decimal(balance['available'])
+
+        print("_account_balances",str(self._account_balances))
+        print("_account_available_balances", str(self._account_available_balances))
 
     cdef object c_get_fee(self,
                           str base_currency,
@@ -339,15 +346,21 @@ cdef class MexcExchange(ExchangeBase):
         return estimate_fee("mexc", is_maker)
 
     async def _update_trading_rules(self):
+        print("_update_trading_rules")
         cdef:
-            int64_t last_tick = <int64_t> (self._last_timestamp / 60.0)
-            int64_t current_tick = <int64_t> (self._current_timestamp / 60.0)
-        if current_tick > last_tick or len(self._trading_rules) < 1:
-            exchange_info = await self._api_request("GET", path_url=MEXC_SYMBOL_URL)
-            trading_rules_list = self._format_trading_rules(exchange_info['data'])
-            self._trading_rules.clear()
-            for trading_rule in trading_rules_list:
-                self._trading_rules[trading_rule.trading_pair] = trading_rule
+            int64_t last_tick = 0
+            int64_t current_tick = 0
+        try:
+            last_tick = <int64_t> (self._last_timestamp / 60.0)
+            current_tick = <int64_t> (self._current_timestamp / 60.0)
+            if current_tick > last_tick or len(self._trading_rules) < 1:
+                exchange_info = await self._api_request("GET", path_url=MEXC_SYMBOL_URL)
+                trading_rules_list = self._format_trading_rules(exchange_info['data'])
+                self._trading_rules.clear()
+                for trading_rule in trading_rules_list:
+                    self._trading_rules[trading_rule.trading_pair] = trading_rule
+        except Exception as ex:
+            self.logger().error(f"Error _update_trading_rules:" + ex, exc_info=True)
 
     def _format_trading_rules(self, raw_trading_pair_info: List[Dict[str, Any]]) -> List[TradingRule]:
         cdef:
@@ -492,7 +505,7 @@ cdef class MexcExchange(ExchangeBase):
             try:
                 self._poll_notifier = asyncio.Event()
                 await self._poll_notifier.wait()
-
+                print("_status_polling_loop")
                 await safe_gather(
                     self._update_balances(),
                     self._update_order_status(),

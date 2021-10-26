@@ -50,7 +50,8 @@ class MexcUserStreamTracker(UserStreamTracker):
         return "mexc"
 
     async def start(self):
-        self._user_stream_tracking_task = safe_ensure_future(
-            self.data_source.listen_for_user_stream(self._ev_loop, self._user_stream)
-        )
-        await safe_gather(self._user_stream_tracking_task)
+        pass
+        # self._user_stream_tracking_task = safe_ensure_future(
+        #     self.data_source.listen_for_user_stream(self._ev_loop, self._user_stream)
+        # )
+        # await safe_gather(self._user_stream_tracking_task)

@@ -22,3 +22,4 @@ def convert_from_exchange_trading_pair(exchange_trading_pair: str) -> str:
 
 def convert_to_exchange_trading_pair(hb_trading_pair: str) -> str:
     return str.replace("-", "_");
+

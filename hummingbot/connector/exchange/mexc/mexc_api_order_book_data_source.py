@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from urllib.parse import urlencode
 
 import aiohttp
 import aiohttp.client_ws
@@ -29,7 +30,7 @@ from hummingbot.connector.exchange.mexc.constants import (
     MEXC_SYMBOL_URL,
     MEXC_DEPTH_URL,
     MEXC_TICKERS_URL,
-    MEXC_WS_URI_PUBLIC,
+    MEXC_WS_URI_PUBLIC, MEXC_BASE_URL,
 )
 
 from dateutil.parser import parse as dateparse
@@ -44,6 +45,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     _mexcaobds_logger: Optional[HummingbotLogger] = None
 
+    api_key = ""
+
     @classmethod
     def logger(cls) -> HummingbotLogger:
         if cls._mexcaobds_logger is None:
@@ -54,10 +57,15 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         super().__init__(trading_pairs)
         self._trading_pairs: List[str] = trading_pairs
 
+
     @staticmethod
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
-            async with client.get(MEXC_SYMBOL_URL) as products_response:
+            params: dict() = {}
+            # params.update({'api_key': mexc_meta.api_key})
+            url = MEXC_BASE_URL + MEXC_SYMBOL_URL
+            print("mexc fetch_trading_pairs",url)
+            async with client.get(url,ssl_context=ssl_context) as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -89,7 +97,11 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     @classmethod
     async def get_last_traded_prices(cls, trading_pairs: List[str]) -> Dict[str, float]:
         async with aiohttp.ClientSession() as client:
-            async with client.get(MEXC_TICKERS_URL) as products_response:
+            params: dict() = {}
+            # params.update({'api_key': mexc_meta.api_key})
+            url = MEXC_BASE_URL + MEXC_TICKERS_URL
+            print("mexc get_last_traded_prices",url)
+            async with client.get(url,ssl_context=ssl_context) as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -121,7 +133,12 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     @staticmethod
     async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str) -> Dict[str, Any]:
         params = {}
-        async with client.get(MEXC_DEPTH_URL.format(trading_pair=trading_pair), params=params) as response:
+        params: dict() = {}
+        # params.update({'api_key': mexc_meta.api_key})
+        tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
+        url = MEXC_BASE_URL + tick_url
+        print("mexc get_snapshot", url)
+        async with client.get(url,ssl_context=ssl_context) as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "

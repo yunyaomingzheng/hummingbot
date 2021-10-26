@@ -45,7 +45,6 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     def last_recv_time(self) -> float:
         return self._last_recv_time
 
-    """mexc 私有不登陆，同时接口较少"""
 
     async def _authenticate_client(self):
         """
