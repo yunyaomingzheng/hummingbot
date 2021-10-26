@@ -275,11 +275,13 @@ cdef class MexcExchange(ExchangeBase):
                            is_auth_required: bool = False) -> Dict[str, Any]:
 
         headers = {"Content-Type": "application/json"}
-        url = urljoin(MEXC_BASE_URL, path_url)
+        # url = urljoin(MEXC_BASE_URL, path_url)
         client = await self._http_client()
         text_data = ujson.dumps(data) if data else None
 
-        url = self._mexc_auth.add_auth_to_params(method, url, params, is_auth_required)
+        path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
+        # url = MEXC_BASE_URL + path_url
+        url = urljoin(MEXC_BASE_URL, path_url)
         print("url:",url)
         print("header:",str(headers))
         print("params:", str(params))
@@ -312,11 +314,11 @@ cdef class MexcExchange(ExchangeBase):
             object balance
         print("get")
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
-        print("msg:" + msg)
-        if msg['code'] == '200':
+        print("msg:" + str(msg))
+        if msg['code'] == 200:
             balance = msg['data']
         else:
-            raise Exception(msg['msg'])
+            raise Exception(msg)
 
         self._account_available_balances.clear()
         self._account_balances.clear()
