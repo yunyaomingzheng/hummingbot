@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import base64
-from datetime import datetime
 import hashlib
 import hmac
 import time
@@ -11,7 +10,7 @@ from typing import (
 )
 from collections import OrderedDict
 
-import mexc_public
+from hummingbot.connector.exchange.mexc import mexc_public
 from hummingbot.connector.exchange.mexc import mexc_utils
 from urllib.parse import urlencode, quote, unquote
 
@@ -22,10 +21,12 @@ class MexcAuth:
         self.secret_key: str = secret_key
 
     def _sig(self, method, path, original_params=None):
+
         params = {
             'api_key': self.api_key,
             'req_time': mexc_public.seconds()
         }
+        print("params",params)
         if original_params is not None:
             params.update(original_params)
         params_str = '&'.join('{}={}'.format(k, params[k]) for k in sorted(params))

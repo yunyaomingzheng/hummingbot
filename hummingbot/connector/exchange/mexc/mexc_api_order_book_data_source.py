@@ -18,7 +18,7 @@ from typing import (
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-import mexc_public
+from hummingbot.connector.exchange.mexc import mexc_public
 from hummingbot.connector.exchange.mexc import mexc_utils
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.core.data_type.order_book import OrderBook

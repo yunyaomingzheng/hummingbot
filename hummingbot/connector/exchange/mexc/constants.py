@@ -4,11 +4,15 @@ from urllib.parse import urljoin
 
 MEXC_BASE_URL = "https://www.mexc.com"
 
-MEXC_SYMBOL_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/symbols')
-MEXC_TICKERS_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/ticker')
-MEXC_DEPTH_URL = urljoin(MEXC_BASE_URL,
-                         '/open/api/v2/market/depth?symbol={trading_pair}&sz=200')  # Size=200 by default?
-MEXC_PRICE_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/ticker?symbol={trading_pair}')
+# MEXC_SYMBOL_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/symbols')
+# MEXC_TICKERS_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/ticker')
+# MEXC_DEPTH_URL = urljoin(MEXC_BASE_URL,
+#                          '/open/api/v2/market/depth?symbol={trading_pair}&sz=200')  # Size=200 by default?
+# MEXC_PRICE_URL = urljoin(MEXC_BASE_URL, '/open/api/v2/market/ticker?symbol={trading_pair}')
+MEXC_SYMBOL_URL = '/open/api/v2/market/symbols'
+MEXC_TICKERS_URL = '/open/api/v2/market/ticker'
+MEXC_DEPTH_URL = '/open/api/v2/market/depth?symbol={trading_pair}&sz=200'  # Size=200 by default?
+MEXC_PRICE_URL = '/open/api/v2/market/ticker?symbol={trading_pair}'
 MEXC_PING_URL = '/open/api/v2/common/ping'
 # Doesn't include base URL as the tail is required to generate the signature
 

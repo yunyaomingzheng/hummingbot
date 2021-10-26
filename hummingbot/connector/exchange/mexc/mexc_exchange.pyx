@@ -66,6 +66,9 @@ from hummingbot.connector.exchange.mexc.mexc_public import (
     convert_from_exchange_trading_pair,
 )
 
+import ssl
+ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+
 hm_logger = None
 s_decimal_0 = Decimal(0)
 TRADING_PAIR_SPLITTER = "-"
@@ -276,14 +279,18 @@ cdef class MexcExchange(ExchangeBase):
         client = await self._http_client()
         text_data = ujson.dumps(data) if data else None
 
-        path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
-
+        url = self._mexc_auth.add_auth_to_params(method, url, params, is_auth_required)
+        print("url:",url)
+        print("header:",str(headers))
+        print("params:", str(params))
         response_core = client.request(
             method=method.upper(),
             url=url,
             headers=headers,
             params=params if params else None,
-            data=text_data
+            data=text_data,
+            proxy="http://127.0.0.1:1087",
+            ssl_context=ssl_context
         )
 
         async with response_core as response:
@@ -303,9 +310,9 @@ cdef class MexcExchange(ExchangeBase):
             dict new_balances = {}
             str asset_name
             object balance
-
+        print("get")
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
-
+        print("msg:" + msg)
         if msg['code'] == '200':
             balance = msg['data']
         else:
