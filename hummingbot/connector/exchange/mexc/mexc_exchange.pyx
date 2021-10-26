@@ -126,7 +126,7 @@ cdef class MexcExchange(ExchangeBase):
 
         super().__init__()
         self._async_scheduler = AsyncCallScheduler(call_interval=0.5)
-        self._data_soutce_type = order_book_tracker_data_source_type
+        self._data_source_type = order_book_tracker_data_source_type
         self._ev_loop = asyncio.get_event_loop()
         self._mexc_auth = MexcAuth(api_key=mexc_api_key, secret_key=mexc_secret_key)
         self._in_flight_orders = {}
@@ -298,7 +298,7 @@ cdef class MexcExchange(ExchangeBase):
     async def _update_balances(self):
         cdef:
             str path_url = MEXC_BALANCE_URL
-            list balances
+            dict balances = {}
             dict new_available_balances = {}
             dict new_balances = {}
             str asset_name
@@ -697,6 +697,7 @@ cdef class MexcExchange(ExchangeBase):
             self.c_start_tracking_order(
                 client_order_id=order_id,
                 exchange_order_id=exchange_order_id,
+                trading_pair=trading_pair,
                 order_type=order_type,
                 trade_type=TradeType.BUY,
                 price=decimal_price,

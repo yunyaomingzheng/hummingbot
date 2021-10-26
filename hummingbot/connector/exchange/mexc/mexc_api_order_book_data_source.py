@@ -18,6 +18,7 @@ from typing import (
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+import mexc_public
 from hummingbot.connector.exchange.mexc import mexc_utils
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.core.data_type.order_book import OrderBook
@@ -73,12 +74,13 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     async def get_new_order_book(self, trading_pair: str) -> OrderBook:
         async with aiohttp.ClientSession() as client:
+            print("get_snapshot2")
             snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
 
             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
                 snapshot,
                 trading_pair,
-                timestamp=mexc_utils.microseconds(),
+                timestamp=mexc_public.microseconds(),
                 metadata={"trading_pair": trading_pair})
             order_book: OrderBook = self.order_book_create_function()
             order_book.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
@@ -117,7 +119,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return self._trading_pairs
 
     @staticmethod
-    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str) -> Dict[str: Any]:
+    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str) -> Dict[str, Any]:
         params = {}
         async with client.get(MEXC_DEPTH_URL.format(trading_pair=trading_pair), params=params) as response:
             response: aiohttp.ClientResponse = response
@@ -126,7 +128,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                               f"HTTP status is {response.status}.")
             api_data = await response.read()
             data: Dict[str, Any] = json.loads(api_data)['data'][0]
-            data['ts'] = mexc_utils.microseconds()
+            data['ts'] = mexc_public.microseconds()
 
             return data
 
@@ -233,7 +235,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     #                         msg['data']['bids'] = bids
     #
     #                         order_book_message: OrderBookMessage = MexcOrderBook.diff_message_from_exchange(
-    #                             msg['data'], mexc_utils.microseconds(),  metadata={"trading_pair": trading_pair}
+    #                             msg['data'], mexc_public.microseconds(),  metadata={"trading_pair": trading_pair}
     #                         )
     #                         output.put_nowait(order_book_message)
     #                     else:
@@ -348,7 +350,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                             msg['data']['bids'] = bids
 
                             order_book_message: OrderBookMessage = MexcOrderBook.diff_message_from_exchange(
-                                msg['data'], mexc_utils.microseconds(), metadata={"trading_pair": trading_pair}
+                                msg['data'], mexc_public.microseconds(), metadata={"trading_pair": trading_pair}
                             )
                             output.put_nowait(order_book_message)
                         else:
@@ -369,11 +371,12 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 async with aiohttp.ClientSession() as client:
                     for trading_pair in trading_pairs:
                         try:
+                            print("get_snapshot1")
                             snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
                             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
                                 snapshot,
                                 trading_pair,
-                                timestamp=mexc_utils.microseconds(),
+                                timestamp=mexc_public.microseconds(),
                                 metadata={"trading_pair": trading_pair})
                             output.put_nowait(snapshot_msg)
                             self.logger().debug(f"Saved order book snapshot for {trading_pair}")

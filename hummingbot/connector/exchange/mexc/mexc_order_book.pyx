@@ -154,5 +154,4 @@ cdef class MexcOrderBook(OrderBook):
     def from_snapshot(cls, msg: OrderBookMessage) -> "OrderBook":
         retval = MexcOrderBook()
         retval.apply_snapshot(msg.bids, msg.asks, msg.update_id)
-        retval.c_apply_snapshot()
         return retval
