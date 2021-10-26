@@ -18,8 +18,11 @@ from typing import (
 )
 import websockets
 from websockets.exceptions import ConnectionClosed
-
 from hummingbot.connector.exchange.mexc import mexc_public
+from hummingbot.connector.exchange.mexc.mexc_public import (
+    convert_from_exchange_trading_pair,
+    convert_to_exchange_trading_pair
+)
 from hummingbot.connector.exchange.mexc import mexc_utils
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.core.data_type.order_book import OrderBook
@@ -57,15 +60,14 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         super().__init__(trading_pairs)
         self._trading_pairs: List[str] = trading_pairs
 
-
     @staticmethod
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
             params: dict() = {}
             # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
-            print("mexc fetch_trading_pairs",url)
-            async with client.get(url,ssl_context=ssl_context) as products_response:
+            print("mexc fetch_trading_pairs", url)
+            async with client.get(url, ssl_context=ssl_context) as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -100,8 +102,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             params: dict() = {}
             # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            print("mexc get_last_traded_prices",url)
-            async with client.get(url,ssl_context=ssl_context) as products_response:
+            print("mexc get_last_traded_prices", url)
+            async with client.get(url, ssl_context=ssl_context) as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -113,6 +115,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 out: Dict[str, float] = {}
 
                 for trading_pair in trading_pairs:
+                    trading_pair = convert_to_exchange_trading_pair(trading_pair)
                     out[trading_pair] = float(all_markets['last'][trading_pair])
 
                 return out
@@ -135,16 +138,17 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         params = {}
         params: dict() = {}
         # params.update({'api_key': mexc_meta.api_key})
+        trading_pair = convert_to_exchange_trading_pair(trading_pair)
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
         print("mexc get_snapshot", url)
-        async with client.get(url,ssl_context=ssl_context) as response:
+        async with client.get(url, ssl_context=ssl_context) as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
                               f"HTTP status is {response.status}.")
             api_data = await response.read()
-            data: Dict[str, Any] = json.loads(api_data)['data'][0]
+            data: Dict[str, Any] = json.loads(api_data)['data']
             data['ts'] = mexc_public.microseconds()
 
             return data
@@ -314,16 +318,18 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 await session.close()
 
     async def _inner_messages(self,
-                              ws: aiohttp.client_ws.ClientWebSocketResponse) -> AsyncIterable[str]:
+                              ws: aiohttp.ClientWebSocketResponse) -> AsyncIterable[str]:
         try:
             while True:
                 try:
                     msg: str = await asyncio.wait_for(ws.receive_json(), timeout=self.MESSAGE_TIMEOUT)
+                    # print("msg,",msg)
                     yield msg
                 except asyncio.TimeoutError:
                     pong_waiter = await ws.ping()
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except asyncio.TimeoutError:
+            print("error")
             self.logger().warning("WebSocket ping timed out . Going to reconnect...")
             return
         except ConnectionClosed:
@@ -336,38 +342,40 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl_context=ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
-
                     for trading_pair in trading_pairs:
+                        trading_pair = convert_to_exchange_trading_pair(trading_pair)
                         subscribe_request: Dict[str, Any] = {
                             "op": "sub.depth",
                             "symbol": trading_pair,
                         }
                         await ws.send_str(json.dumps(subscribe_request))
 
-                    async for raw_msg in self._inner_message(ws):
-                        decoded_msg: str = raw_msg
+                    async for raw_msg in self._inner_messages(ws):
 
-                        if '"channel":"push.depth"' in decoded_msg:
-                            msg = json.loads(decoded_msg)
-                            asks = [
-                                {
-                                    'price': ask['p'],
-                                    'quantity': ask['q']
-                                }
-                                for ask in msg["data"]["asks"]]
-                            bids = [
-                                {
-                                    'price': bid['p'],
-                                    'quantity': bid['q']
-                                }
-                                for bid in msg["data"]["bids"]]
-                            msg['data']['bids'] = asks
-                            msg['data']['bids'] = bids
+                        decoded_msg: dict = raw_msg
 
+                        if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.depth':
+                            if decoded_msg['data'].get('asks'):
+                                asks = [
+                                    {
+                                        'price': ask['p'],
+                                        'quantity': ask['q']
+                                    }
+                                    for ask in decoded_msg["data"]["asks"]]
+                                decoded_msg['data']['asks'] = asks
+                            if decoded_msg['data'].get('bids'):
+                                bids = [
+                                    {
+                                        'price': bid['p'],
+                                        'quantity': bid['q']
+                                    }
+                                    for bid in decoded_msg["data"]["bids"]]
+                                decoded_msg['data']['bids'] = bids
                             order_book_message: OrderBookMessage = MexcOrderBook.diff_message_from_exchange(
-                                msg['data'], mexc_public.microseconds(), metadata={"trading_pair": trading_pair}
+                                decoded_msg['data'], mexc_public.microseconds(),
+                                metadata={"trading_pair": convert_from_exchange_trading_pair(trading_pair)}
                             )
                             output.put_nowait(order_book_message)
                         else:
@@ -388,7 +396,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 async with aiohttp.ClientSession() as client:
                     for trading_pair in trading_pairs:
                         try:
-                            print("get_snapshot1")
                             snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
                             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
                                 snapshot,

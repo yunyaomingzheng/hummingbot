@@ -70,12 +70,11 @@ cdef class MexcOrderBook(OrderBook):
             data.update(metadata)
 
         msg_ts = int(timestamp * 1e-3)
-
         content = {
             "trading_pair": data["trading_pair"],
             "update_id": msg_ts,
-            "bids": data["bids"],
-            "asks": data["asks"]
+            "bids": data.get("bids",[]),
+            "asks": data.get("asks",[])
         }
         return MexcOrderBookMessage(OrderBookMessageType.DIFF, content, timestamp or msg_ts)
 
