@@ -56,7 +56,7 @@ cdef class MexcOrderBook(OrderBook):
             "trade_type": float(TradeType.SELL.value) if msg["T"] == 2 else float(TradeType.BUY.value),
             "trade_id": msg["t"],
             "update_id": msg["t"],
-            "amount": msg["v"],
+            "amount": msg["q"],
             "price": msg["p"]
         }
         return MexcOrderBookMessage(OrderBookMessageType.TRADE, content, timestamp or msg_ts)
@@ -150,7 +150,7 @@ cdef class MexcOrderBook(OrderBook):
         }, timestamp=ts * 1e-3)
 
     @classmethod
-    def from_snapshot(cls, msg: OrderBookMessage) -> "OrderBook":
+    def from_snapshot(cls, msg: OrderBookMessage) -> OrderBook:
         retval = MexcOrderBook()
         retval.apply_snapshot(msg.bids, msg.asks, msg.update_id)
         return retval

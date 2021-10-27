@@ -67,7 +67,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
             print("mexc fetch_trading_pairs", url)
-            async with client.get(url, ssl_context=ssl_context) as products_response:
+            async with client.get(url, ssl_context=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -104,7 +104,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
             print("mexc get_last_traded_prices", url)
-            async with client.get(url, ssl_context=ssl_context) as products_response:
+            async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -116,9 +116,9 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 out: Dict[str, float] = {}
 
                 for trading_pair in trading_pairs:
-                    trading_pair = convert_to_exchange_trading_pair(trading_pair)
-                    out[trading_pair] = float(all_markets['last'][trading_pair])
-
+                    exchange_trading_pair = convert_to_exchange_trading_pair(trading_pair)
+                    out[trading_pair] = float(all_markets['last'][exchange_trading_pair])
+                print("out",out)
                 return out
 
     async def get_trading_pairs(self) -> List[str]:
@@ -144,7 +144,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
         print("mexc get_snapshot", url)
-        async with client.get(url, ssl_context=ssl_context) as response:
+        async with client.get(url, ssl_context=ssl_context,proxy="http://127.0.0.1:1087") as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
@@ -275,6 +275,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         while True:
             try:
                 trading_pairs: List[str] = self._trading_pairs
+                print("trading_pairs test :",trading_pairs)
                 session = aiohttp.ClientSession()
                 async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl_context=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
@@ -300,13 +301,13 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                             self.logger().debug(f"Recived new trade: {decoded_msg}")
 
                             for data in decoded_msg['data']['deals']:
-                                print("listen_for_trades ",data)
+                                # print("listen_for_trades ",data)
                                 trading_pair = convert_from_exchange_trading_pair(decoded_msg['symbol'])
                                 trade_message: OrderBookMessage = MexcOrderBook.trade_message_from_exchange(
                                     data, data['t'], metadata={"trading_pair": trading_pair}
                                 )
                                 self.logger().debug(f'Putting msg in queue: {str(trade_message)}')
-
+                                # print("trade_message ", str(trade_message))
                                 output.put_nowait(trade_message)
                         else:
                             self.logger().debug(f"Unrecognized message received from MEXC websocket: {decoded_msg}")
