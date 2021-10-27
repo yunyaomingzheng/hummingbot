@@ -209,7 +209,7 @@ cdef class MexcExchange(ExchangeBase):
         self._async_scheduler.stop()
 
     async def start_network(self):
-        print("start_network")
+        print("mexc start_network")
         self._stop_network()
         self._order_book_tracker.start()
         self._trading_rules_polling_task = safe_ensure_future(self._trading_rules_polling_loop())
@@ -250,6 +250,10 @@ cdef class MexcExchange(ExchangeBase):
     cdef c_tick(self, double timestamp):
         cdef:
             double now = time.time()
+            # double poll_interval = (self.SHORT_POLL_INTERVAL
+            #                         if now - self.user_stream_tracker.last_recv_time > 60.0
+            #                         else self.LONG_POLL_INTERVAL
+            #                         )
             double poll_interval = (self.SHORT_POLL_INTERVAL
                                     if now - self.user_stream_tracker.last_recv_time > 60.0
                                     else self.LONG_POLL_INTERVAL
@@ -314,9 +318,9 @@ cdef class MexcExchange(ExchangeBase):
             dict new_balances = {}
             str asset_name
             object balance
-        print("get")
+        # print("get")
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
-        print("msg:" + str(msg))
+        # print("msg:" + str(msg))
         if msg['code'] == 200:
             balances = msg['data']
         else:
@@ -331,8 +335,8 @@ cdef class MexcExchange(ExchangeBase):
                 self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
                 self._account_available_balances[k] = Decimal(balance['available'])
 
-        print("_account_balances",str(self._account_balances))
-        print("_account_available_balances", str(self._account_available_balances))
+        # print("_account_balances",str(self._account_balances))
+        # print("_account_available_balances", str(self._account_available_balances))
 
     cdef object c_get_fee(self,
                           str base_currency,

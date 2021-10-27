@@ -60,6 +60,18 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
         self.logger().info("Successfully authenticated")
 
+    async  def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
+        while True:
+            try:
+                await self._api_request(method="GET", path_url=MEXC_PING_URL)
+                self._last_recv_time = time.time()
+                await asyncio.sleep(3.0)
+            except asyncio.CancelledError:
+                raise
+            except Exception as ex:
+                return NetworkStatus.NOT_CONNECTED
+            return NetworkStatus.CONNECTED
+
     # async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
     #     """
     #     *required

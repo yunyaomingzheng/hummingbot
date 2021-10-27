@@ -74,12 +74,13 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     raise IOError(f"Error fetching active MEXC. HTTP status is {products_response.status}.")
 
                 data = await products_response.json()
+                print("fetch_trading_pairs:",data)
                 data = data['data']
 
                 trading_pairs = []
                 for item in data:
                     if item['state'] == "ENABLED":
-                        trading_pairs.append(item["symbol"])
+                        trading_pairs.append(convert_from_exchange_trading_pair(item["symbol"]))
         return trading_pairs
 
     async def get_new_order_book(self, trading_pair: str) -> OrderBook:
@@ -121,6 +122,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 return out
 
     async def get_trading_pairs(self) -> List[str]:
+        print("get_trading_pairs")
         if not self._trading_pairs:
             try:
                 self._trading_pairs = await self.fetch_trading_pairs()
@@ -278,6 +280,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     for trading_pair in trading_pairs:
+                        trading_pair = convert_to_exchange_trading_pair(trading_pair)
                         subscribe_request: Dict[str, Any] = {
                             # "method": "sub.deal",
                             # "param": {
@@ -289,16 +292,16 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         await ws.send_str(json.dumps(subscribe_request))
 
                     async for raw_msg in self._inner_messages(ws):
-                        decoded_msg: str = raw_msg
+                        decoded_msg: dict = raw_msg
 
-                        self.logger().debug("decode menssae:" + decoded_msg)
+                        self.logger().debug("decode menssae:" + str(decoded_msg))
 
-                        if '"channel":"push.deal"' in decoded_msg:
+                        if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.deal':
                             self.logger().debug(f"Recived new trade: {decoded_msg}")
 
-                            msg = json.loads(decoded_msg)
-                            for data in msg['data']:
-                                trading_pair = msg['symbol']
+                            for data in decoded_msg['data']['deals']:
+                                print("listen_for_trades ",data)
+                                trading_pair = convert_from_exchange_trading_pair(decoded_msg['symbol'])
                                 trade_message: OrderBookMessage = MexcOrderBook.trade_message_from_exchange(
                                     data, data['t'], metadata={"trading_pair": trading_pair}
                                 )
