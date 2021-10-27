@@ -288,16 +288,17 @@ cdef class MexcExchange(ExchangeBase):
         path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
         # url = MEXC_BASE_URL + path_url
         url = urljoin(MEXC_BASE_URL, path_url)
-        print("url:",url)
-        print("header:",str(headers))
-        print("params:", str(params))
+        print("url:",str(url)[0:100])
+        # print("header:",str(headers))
+        # print("params:", str(params))
+        # print("url",url)
         response_core = client.request(
             method=method.upper(),
             url=url,
             headers=headers,
             params=params if params else None,
             data=text_data,
-            # proxy="http://127.0.0.1:1087",
+            proxy="http://127.0.0.1:1087",
             ssl_context=ssl_context
         )
 
@@ -306,6 +307,7 @@ cdef class MexcExchange(ExchangeBase):
                 raise IOError(f"Error request from {url}. Response: {await response.json()}.")
             try:
                 parsed_response = await response.json()
+                # print("parsed_response",str(parsed_response)[0:100])
                 return parsed_response
             except Exception as ex:
                 raise IOError(f"Error parsing data from {url}." + repr(ex))
@@ -328,7 +330,6 @@ cdef class MexcExchange(ExchangeBase):
 
         self._account_available_balances.clear()
         self._account_balances.clear()
-        print()
         for k, balance in balances.items():
             # print(k,balance)
             if Decimal(balance['frozen']) + Decimal(balance['available']) > Decimal(0.001):

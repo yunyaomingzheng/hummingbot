@@ -43,7 +43,7 @@ ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 
 class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
-    MESSAGE_TIMEOUT = 30.0
+    MESSAGE_TIMEOUT = 120.0
     PING_TIMEOUT = 10.0
 
     _mexcaobds_logger: Optional[HummingbotLogger] = None
@@ -67,7 +67,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
             print("mexc fetch_trading_pairs", url)
-            async with client.get(url, ssl_context=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
+            async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -144,7 +144,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
         print("mexc get_snapshot", url)
-        async with client.get(url, ssl_context=ssl_context,proxy="http://127.0.0.1:1087") as response:
+        async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
@@ -277,7 +277,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 trading_pairs: List[str] = self._trading_pairs
                 print("trading_pairs test :",trading_pairs)
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl_context=ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     for trading_pair in trading_pairs:
@@ -293,6 +293,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         await ws.send_str(json.dumps(subscribe_request))
 
                     async for raw_msg in self._inner_messages(ws):
+                        self.logger().warning("WebSocket receive_json ",raw_msg)
                         decoded_msg: dict = raw_msg
 
                         self.logger().debug("decode menssae:" + str(decoded_msg))
@@ -327,10 +328,11 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             while True:
                 try:
                     msg: str = await asyncio.wait_for(ws.receive_json(), timeout=self.MESSAGE_TIMEOUT)
-                    # print("msg,",msg)
+                    # self.logger().info("WebSocket msg ...",msg)
                     yield msg
                 except asyncio.TimeoutError:
-                    pong_waiter = await ws.ping()
+                    pong_waiter = ws.ping()
+                    self.logger().warning("WebSocket receive_json timeout ...")
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except asyncio.TimeoutError:
             print("error")

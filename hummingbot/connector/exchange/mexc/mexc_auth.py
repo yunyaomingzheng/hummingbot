@@ -26,7 +26,7 @@ class MexcAuth:
             'api_key': self.api_key,
             'req_time': mexc_public.seconds()
         }
-        print("params",params)
+        # print("params",params)
         if original_params is not None:
             params.update(original_params)
         params_str = '&'.join('{}={}'.format(k, params[k]) for k in sorted(params))
