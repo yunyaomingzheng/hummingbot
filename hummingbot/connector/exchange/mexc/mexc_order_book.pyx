@@ -23,7 +23,6 @@ cdef class MexcOrderBook(OrderBook):
         global _mexcob_logger
         if _mexcob_logger is None:
             _mexcob_logger = logging.getLogger(__name__),
-            print("mexc:__name__", __name__)
         return _mexcob_logger
 
     @classmethod

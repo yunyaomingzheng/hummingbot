@@ -68,8 +68,6 @@ from hummingbot.connector.exchange.mexc.mexc_public import (
 
 from decimal import *
 
-import ssl
-ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 hm_logger = None
 s_decimal_0 = Decimal(0)
@@ -212,7 +210,6 @@ cdef class MexcExchange(ExchangeBase):
         self._async_scheduler.stop()
 
     async def start_network(self):
-        print("mexc start_network")
         self._stop_network()
         self._order_book_tracker.start()
         self._trading_rules_polling_task = safe_ensure_future(self._trading_rules_polling_loop())
@@ -253,10 +250,6 @@ cdef class MexcExchange(ExchangeBase):
     cdef c_tick(self, double timestamp):
         cdef:
             double now = time.time()
-            # double poll_interval = (self.SHORT_POLL_INTERVAL
-            #                         if now - self.user_stream_tracker.last_recv_time > 60.0
-            #                         else self.LONG_POLL_INTERVAL
-            #                         )
             double poll_interval = (self.SHORT_POLL_INTERVAL
                                     if now - self.user_stream_tracker.last_recv_time > 60.0
                                     else self.LONG_POLL_INTERVAL
@@ -284,26 +277,17 @@ cdef class MexcExchange(ExchangeBase):
                            is_auth_required: bool = False) -> Dict[str, Any]:
 
         headers = {"Content-Type": "application/json"}
-        # url = urljoin(MEXC_BASE_URL, path_url)
         client = await self._http_client()
         text_data = ujson.dumps(data) if data else None
 
         path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
-        # url = MEXC_BASE_URL + path_url
         url = urljoin(MEXC_BASE_URL, path_url)
-        # if MEXC_BALANCE_URL not in str(url) or MEXC_PING_URL not in str(url):
-        #     print("url:",str(url)[0:100])
-        # # print("header:",str(headers))
-        # # print("params:", str(params))
-        # # print("url",url)
         response_core = client.request(
             method=method.upper(),
             url=url,
             headers=headers,
             # params=params if params else None, #mexc`s params  is already in the url
             data=text_data,
-            proxy="http://127.0.0.1:1087",
-            ssl_context=ssl_context
         )
 
         async with response_core as response:
@@ -311,7 +295,6 @@ cdef class MexcExchange(ExchangeBase):
                 raise IOError(f"Error request from {url}. Response: {await response.json()}.")
             try:
                 parsed_response = await response.json()
-                # print("parsed_response",str(parsed_response)[0:100])
                 return parsed_response
             except Exception as ex:
                 raise IOError(f"Error parsing data from {url}." + repr(ex))
@@ -324,9 +307,7 @@ cdef class MexcExchange(ExchangeBase):
             dict new_balances = {}
             str asset_name
             object balance
-        # print("get")
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
-        # print("msg:" + str(msg))
         if msg['code'] == 200:
             balances = msg['data']
         else:
@@ -335,13 +316,10 @@ cdef class MexcExchange(ExchangeBase):
         self._account_available_balances.clear()
         self._account_balances.clear()
         for k, balance in balances.items():
-            # print(k,balance)
             if Decimal(balance['frozen']) + Decimal(balance['available']) > Decimal(0.001):
                 self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
                 self._account_available_balances[k] = Decimal(balance['available'])
 
-        # print("_account_balances",str(self._account_balances))
-        # print("_account_available_balances", str(self._account_available_balances))
 
     cdef object c_get_fee(self,
                           str base_currency,
@@ -355,7 +333,6 @@ cdef class MexcExchange(ExchangeBase):
         return estimate_fee("mexc", is_maker)
 
     async def _update_trading_rules(self):
-        print("_update_trading_rules")
         cdef:
             int64_t last_tick = 0
             int64_t current_tick = 0
@@ -368,9 +345,6 @@ cdef class MexcExchange(ExchangeBase):
                 self._trading_rules.clear()
                 for trading_rule in trading_rules_list:
                     self._trading_rules[trading_rule.trading_pair] = trading_rule
-                    # if trading_rule.trading_pair == "USDC-USDT":
-                    #     print(trading_rule)
-                # self.logger().error(f"_update_trading_rules:" + str(self._trading_rules), exc_info=True)
         except Exception as ex:
             self.logger().error(f"Error _update_trading_rules:" + str(ex), exc_info=True)
 
@@ -386,9 +360,6 @@ cdef class MexcExchange(ExchangeBase):
                                 max_order_size=Decimal(info["max_amount"]),
                                 min_price_increment=Decimal(mexc_utils.num_to_increment(info["price_scale"])),
                                 min_base_amount_increment=Decimal(mexc_utils.num_to_increment(info["quantity_scale"])),
-                                # min_quote_amount_increment=Decimal(info["1e-{info['value-precision']}"]),
-                                # min_notional_size=Decimal(info["min-order-value"])
-                                # min_notional_size=s_decimal_0  # Couldn't find a value for this in the docs
 
                                 )
                 )
@@ -397,7 +368,6 @@ cdef class MexcExchange(ExchangeBase):
         return trading_rules
 
     async def get_order_status(self, exchangge_order_id: str, trading_pair: str) -> Dict[str, Any]:
-        print("get_order_status exchangge_order_id",exchangge_order_id)
         params = {"order_ids": exchangge_order_id}
         msg = await self._api_request("GET",
                                       path_url=MEXC_ORDER_DETAILS_URL,
@@ -441,12 +411,10 @@ cdef class MexcExchange(ExchangeBase):
                                         f"The order has either been filled or canceled."
                     )
                     continue
-                print("order status ",order_update)
                 tracked_order.last_state = order_update['state']
                 order_status = order_update['state']
                 new_confirmed_amount = Decimal(order_update['deal_quantity'])
                 execute_amount_diff = new_confirmed_amount - tracked_order.executed_amount_base
-                # execute_price = Decimal(order_update["price"])
 
                 if execute_amount_diff > s_decimal_0:
                     execute_price = Decimal(order_update['deal_amount'] / order_update['deal_quantity'])
@@ -565,7 +533,6 @@ cdef class MexcExchange(ExchangeBase):
             try:
                 self._poll_notifier = asyncio.Event()
                 await self._poll_notifier.wait()
-                # print("_status_polling_loop")
                 await safe_gather(
                     self._update_balances(),
                     self._update_order_status(),
@@ -608,20 +575,16 @@ cdef class MexcExchange(ExchangeBase):
         async for stream_message in self._iter_user_stream_queue():
             try:
                 for data in stream_message["data"]:
-                    #args = stream_message.get()
-                    if stream_message[''] == 'yue':  #判断是账户信息还是订单信息
+                    if stream_message['type'] == 'account':
                         for k, balance in data.items():
                             self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
                             self._account_available_balances[k] = Decimal(balance['available'])
-
                         continue
-                    elif stream_message[''] == 'asd':  #判断是账户信息还是订单信息
+                    elif stream_message['type'] == 'order':
                         order_id = data["id"]
                         trading_pair = data["instId"]
                         order_status = data["state"]
-
                         tracked_order = self._in_flight_orders.get(order_id, None)
-
                         if tracked_order is None:
                             continue
 
@@ -695,7 +658,7 @@ cdef class MexcExchange(ExchangeBase):
                             self.c_stop_tracking_order(tracked_order.client_order_id)
 
                     else:
-                        # Ignore all other user stream message types
+
                         continue
             except asyncio.CancelledError:
                 raise
@@ -819,11 +782,9 @@ cdef class MexcExchange(ExchangeBase):
                    object order_type=OrderType.LIMIT,
                    object price=s_decimal_0,
                    dict kwargs={}):
-        print("c_buy")
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
             str order_id = str(f"buy-{trading_pair}-{tracking_nonce}")
-        print("order_id",order_id)
         safe_ensure_future(self.execute_buy(order_id, trading_pair, amount, order_type, price))
         return order_id
 
@@ -897,18 +858,15 @@ cdef class MexcExchange(ExchangeBase):
                     object order_type=OrderType.LIMIT,
                     object price=s_decimal_0,
                     dict kwargs={}):
-        print("mexc c_sell")
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
             str order_id = str(f"sell-{trading_pair}-{tracking_nonce}")
-        print("order_id",order_id)
 
         safe_ensure_future(self.execute_sell(order_id, trading_pair, amount, order_type, price))
         return order_id
 
     async def execute_cancel(self, trading_pair: str, client_order_id: str):
         try:
-            print("execute_cancel order_id",client_order_id)
             tracked_order = self._in_flight_orders.get(client_order_id)
             if tracked_order is None:
                 raise ValueError(f"Failed to cancel order - {client_order_id}. Order not found.")
@@ -957,7 +915,6 @@ cdef class MexcExchange(ExchangeBase):
             params = {
                 'order_ids': quote(','.join([o for o in cancel_order_ids])),
             }
-            print("params,",params)
 
             cancellation_results = []
             try:
@@ -969,7 +926,6 @@ cdef class MexcExchange(ExchangeBase):
                 )
 
                 for order_result_client_order_id,order_result_value in cancel_all_results['data'].items():
-                    # print("cancel_all_results['data']", cancel_all_results['data'], "order_result", order_result)
                     for o in orders_by_trading_pair[trading_pair]:
                         if o.client_order_id == order_result_client_order_id:
                             result_bool = True if  order_result_value == "invalid order state" or order_result_value == "success" else False
@@ -1028,7 +984,6 @@ cdef class MexcExchange(ExchangeBase):
         cdef:
             TradingRule trading_rule = self._trading_rules[trading_pair]
 
-        # print("c_get_order_price_quantum",trading_rule.min_price_increment)
         return trading_rule.min_price_increment
 
     cdef object c_get_order_size_quantum(self, str trading_pair, object price):

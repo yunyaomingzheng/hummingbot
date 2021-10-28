@@ -26,7 +26,6 @@ class MexcAuth:
             'api_key': self.api_key,
             'req_time': mexc_public.seconds()
         }
-        # print("params",params)
         if original_params is not None:
             params.update(original_params)
         params_str = '&'.join('{}={}'.format(k, params[k]) for k in sorted(params))
@@ -66,8 +65,8 @@ class MexcAuth:
         timestamp = str(int(time.time()))
 
         return {
-            "op": operation,  # sub key
-            "api_key": self.api_key,  # //申请的API Key
-            "sign": self.get_signature(operation, timestamp),  # //签名,签名规则  把api_key、req_time以及及op用私钥做一个签名
-            "req_time": timestamp  # //当前时间的时间戳
+            "op": operation,
+            "api_key": self.api_key,
+            "sign": self.get_signature(operation, timestamp),
+            "req_time": timestamp
         }
