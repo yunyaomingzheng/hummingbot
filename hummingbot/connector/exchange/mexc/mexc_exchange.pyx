@@ -66,6 +66,8 @@ from hummingbot.connector.exchange.mexc.mexc_public import (
     convert_from_exchange_trading_pair,
 )
 
+from decimal import *
+
 import ssl
 ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
@@ -147,6 +149,7 @@ cdef class MexcExchange(ExchangeBase):
         self._user_stream_tracker = MexcUserStreamTracker(mexc_auth=self._mexc_auth,
                                                           trading_pairs=trading_pairs)
         MexcAPIOrderBookDataSource.api_key = mexc_api_key
+        getcontext().prec = 8
 
     @property
     def name(self) -> str:
@@ -288,15 +291,16 @@ cdef class MexcExchange(ExchangeBase):
         path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
         # url = MEXC_BASE_URL + path_url
         url = urljoin(MEXC_BASE_URL, path_url)
-        print("url:",str(url)[0:100])
-        # print("header:",str(headers))
-        # print("params:", str(params))
-        # print("url",url)
+        # if MEXC_BALANCE_URL not in str(url) or MEXC_PING_URL not in str(url):
+        #     print("url:",str(url)[0:100])
+        # # print("header:",str(headers))
+        # # print("params:", str(params))
+        # # print("url",url)
         response_core = client.request(
             method=method.upper(),
             url=url,
             headers=headers,
-            params=params if params else None,
+            # params=params if params else None, #mexc`s params  is already in the url
             data=text_data,
             proxy="http://127.0.0.1:1087",
             ssl_context=ssl_context
@@ -364,8 +368,11 @@ cdef class MexcExchange(ExchangeBase):
                 self._trading_rules.clear()
                 for trading_rule in trading_rules_list:
                     self._trading_rules[trading_rule.trading_pair] = trading_rule
+                    # if trading_rule.trading_pair == "USDC-USDT":
+                    #     print(trading_rule)
+                # self.logger().error(f"_update_trading_rules:" + str(self._trading_rules), exc_info=True)
         except Exception as ex:
-            self.logger().error(f"Error _update_trading_rules:" + ex, exc_info=True)
+            self.logger().error(f"Error _update_trading_rules:" + str(ex), exc_info=True)
 
     def _format_trading_rules(self, raw_trading_pair_info: List[Dict[str, Any]]) -> List[TradingRule]:
         cdef:
@@ -390,6 +397,7 @@ cdef class MexcExchange(ExchangeBase):
         return trading_rules
 
     async def get_order_status(self, exchangge_order_id: str, trading_pair: str) -> Dict[str, Any]:
+        print("get_order_status exchangge_order_id",exchangge_order_id)
         params = {"order_ids": exchangge_order_id}
         msg = await self._api_request("GET",
                                       path_url=MEXC_ORDER_DETAILS_URL,
@@ -406,87 +414,86 @@ cdef class MexcExchange(ExchangeBase):
 
         tracked_orders = list(self._in_flight_orders.values())
         for tracked_order in tracked_orders:
-            exchange_order_id = await tracked_order.get_exchange_order_id()
             try:
-                order_update = await self.get_order_status(exchange_order_id, tracked_order.trading_pair)
-            except MexcAPIError as ex:
-                err_code = ex.error_payload.get("error").get('err-code')
-                self.c_stop_tracking_order(tracked_order.client_order_id)
-                self.logger().info(f"The limit order {tracked_order.client_order_id} "
-                                   f"has failed according to order status API. - {err_code}")
-                self.c_trigger_event(
-                    self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                    MarketOrderFailureEvent(
+                exchange_order_id = await tracked_order.get_exchange_order_id()
+                try:
+                    order_update = await self.get_order_status(exchange_order_id, tracked_order.trading_pair)
+                except MexcAPIError as ex:
+                    err_code = ex.error_payload.get("error").get('err-code')
+                    self.c_stop_tracking_order(tracked_order.client_order_id)
+                    self.logger().info(f"The limit order {tracked_order.client_order_id} "
+                                       f"has failed according to order status API. - {err_code}")
+                    self.c_trigger_event(
+                        self.MARKET_ORDER_FAILURE_EVENT_TAG,
+                        MarketOrderFailureEvent(
+                            self._current_timestamp,
+                            tracked_order.client_order_id,
+                            tracked_order.order_type
+                        )
+                    )
+                    continue
+
+                if order_update is None:
+                    self.logger().network(
+                        f"Error fetching status update for the order {tracked_order.client_order_id}: "
+                        f"{exchange_order_id}.",
+                        app_warning_msg=f"Could not fetch updates for the order {tracked_order.client_order_id}. "
+                                        f"The order has either been filled or canceled."
+                    )
+                    continue
+                print("order status ",order_update)
+                tracked_order.last_state = order_update['state']
+                order_status = order_update['state']
+                new_confirmed_amount = Decimal(order_update['deal_quantity'])
+                execute_amount_diff = new_confirmed_amount - tracked_order.executed_amount_base
+                # execute_price = Decimal(order_update["price"])
+
+                if execute_amount_diff > s_decimal_0:
+                    execute_price = Decimal(order_update['deal_amount'] / order_update['deal_quantity'])
+                    tracked_order.executed_amount_base = Decimal(order_update['deal_quantity'])
+                    tracked_order.executed_amount_quote = Decimal(order_update['deal_amount'])
+
+                    order_filled_event = OrderFilledEvent(
                         self._current_timestamp,
                         tracked_order.client_order_id,
-                        tracked_order.order_type
-                    )
-                )
-                continue
-
-            if order_update is None:
-                self.logger().network(
-                    f"Error fetching status update for the order {tracked_order.client_order_id}: "
-                    f"{exchange_order_id}.",
-                    app_warning_msg=f"Could not fetch updates for the order {tracked_order.client_order_id}. "
-                                    f"The order has either been filled or canceled."
-                )
-                continue
-
-            tracked_order.last_state = order_update['state']
-            new_confirmed_amount = Decimal(order_update['deal_quantity'])
-            execute_amount_diff = new_confirmed_amount - tracked_order.executed_amount_base
-            # execute_price = Decimal(order_update["price"])
-
-            if execute_amount_diff > s_decimal_0:
-                execute_price = Decimal(order_update['deal_amount'] / order_update['deal_quantity'])
-                tracked_order.executed_amount_base = Decimal(order_update['deal_quantity'])
-                tracked_order.executed_amount_quote = Decimal(order_update['deal_amount'])
-
-                order_filled_event = OrderFilledEvent(
-                    self._current_timestamp,
-                    tracked_order.client_order_id,
-                    tracked_order.trading_pair,
-                    tracked_order.trade_type,
-                    tracked_order.order_type,
-                    execute_price,
-                    execute_amount_diff,
-                    self.c_get_fee(
-                        tracked_order.base_asset,
-                        tracked_order.quote_asset,
-                        tracked_order.order_type,
+                        tracked_order.trading_pair,
                         tracked_order.trade_type,
-                        execute_amount_diff,
+                        tracked_order.order_type,
                         execute_price,
-                    ),
-                    exchange_trade_id=exchange_order_id
-                )
-                self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of the "
-                                   f"order {tracked_order.client_order_id}.")
-                self.c_trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG, order_filled_event)
-
-            if tracked_order.is_open:
-                continue
-
-            if tracked_order.is_done:
-                if not tracked_order.is_cancelled:
-                    self.c_stop_tracking_order(tracked_order.client_order_id)
+                        execute_amount_diff,
+                        self.c_get_fee(
+                            tracked_order.base_asset,
+                            tracked_order.quote_asset,
+                            tracked_order.order_type,
+                            tracked_order.trade_type,
+                            execute_amount_diff,
+                            execute_price,
+                        ),
+                        exchange_trade_id=exchange_order_id
+                    )
+                    self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of the "
+                                       f"order {tracked_order.client_order_id}.")
+                    self.c_trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG, order_filled_event)
+                if order_status == "FILLED":
+                    tracked_order.last_state = order_status
                     if tracked_order.trade_type is TradeType.BUY:
-                        self.logger().info(f"The market buy order {tracked_order.client_order_id} has completed "
-                                           f"according to order status API.")
+                        self.logger().info(
+                            f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
+                            f"according to order delta websocket API.")
                         self.c_trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
                                              BuyOrderCompletedEvent(self._current_timestamp,
                                                                     tracked_order.client_order_id,
                                                                     tracked_order.base_asset,
                                                                     tracked_order.quote_asset,
-                                                                    tracked_order.fee_asset or tracked_order.base_asset,
+                                                                    tracked_order.fee_asset or tracked_order.quote_asset,
                                                                     tracked_order.executed_amount_base,
                                                                     tracked_order.executed_amount_quote,
                                                                     tracked_order.fee_paid,
                                                                     tracked_order.order_type))
-                    else:
-                        self.logger().info(f"The market sell order {tracked_order.client_order_id} has completed "
-                                           f"according to order status API.")
+                    elif tracked_order.trade_type is TradeType.SELL:
+                        self.logger().info(
+                            f"The SELL {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
+                            f"according to order delta websocket API.")
                         self.c_trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
                                              SellOrderCompletedEvent(self._current_timestamp,
                                                                      tracked_order.client_order_id,
@@ -497,20 +504,68 @@ cdef class MexcExchange(ExchangeBase):
                                                                      tracked_order.executed_amount_quote,
                                                                      tracked_order.fee_paid,
                                                                      tracked_order.order_type))
-                else:
                     self.c_stop_tracking_order(tracked_order.client_order_id)
-                    self.logger().info(f"The market order {tracked_order.client_order_id} "
-                                       f"has been cancelled according to order status API.")
+                    continue
+
+                if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
+                    tracked_order.last_state = order_status
+                    self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
+                                       f"according to order delta websocket API.")
                     self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                          OrderCancelledEvent(self._current_timestamp,
                                                              tracked_order.client_order_id))
+                    self.c_stop_tracking_order(tracked_order.client_order_id)
+
+
+                if tracked_order.is_open:
+                    continue
+
+                if tracked_order.is_done:
+                    if not tracked_order.is_cancelled:
+                        self.c_stop_tracking_order(tracked_order.client_order_id)
+                        if tracked_order.trade_type is TradeType.BUY:
+                            self.logger().info(f"The market buy order {tracked_order.client_order_id} has completed "
+                                               f"according to order status API.")
+                            self.c_trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
+                                                 BuyOrderCompletedEvent(self._current_timestamp,
+                                                                        tracked_order.client_order_id,
+                                                                        tracked_order.base_asset,
+                                                                        tracked_order.quote_asset,
+                                                                        tracked_order.fee_asset or tracked_order.base_asset,
+                                                                        tracked_order.executed_amount_base,
+                                                                        tracked_order.executed_amount_quote,
+                                                                        tracked_order.fee_paid,
+                                                                        tracked_order.order_type))
+                        else:
+                            self.logger().info(f"The market sell order {tracked_order.client_order_id} has completed "
+                                               f"according to order status API.")
+                            self.c_trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
+                                                 SellOrderCompletedEvent(self._current_timestamp,
+                                                                         tracked_order.client_order_id,
+                                                                         tracked_order.base_asset,
+                                                                         tracked_order.quote_asset,
+                                                                         tracked_order.fee_asset or tracked_order.quote_asset,
+                                                                         tracked_order.executed_amount_base,
+                                                                         tracked_order.executed_amount_quote,
+                                                                         tracked_order.fee_paid,
+                                                                         tracked_order.order_type))
+                    else:
+                        self.c_stop_tracking_order(tracked_order.client_order_id)
+                        self.logger().info(f"The market order {tracked_order.client_order_id} "
+                                           f"has been cancelled according to order status API.")
+                        self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
+                                             OrderCancelledEvent(self._current_timestamp,
+                                                                 tracked_order.client_order_id))
+            except Exception as ex:
+                self.logger().error("_update_order_status error ..." + repr(ex),exc_info=True)
+
 
     async def _status_polling_loop(self):
         while True:
             try:
                 self._poll_notifier = asyncio.Event()
                 await self._poll_notifier.wait()
-                print("_status_polling_loop")
+                # print("_status_polling_loop")
                 await safe_gather(
                     self._update_balances(),
                     self._update_order_status(),
@@ -597,7 +652,7 @@ cdef class MexcExchange(ExchangeBase):
                                                                   execute_amount_diff,
                                                                   current_fee,
                                                                   exchange_trade_id=order_id))
-                        if order_status == "filled":
+                        if order_status == "FILLED":
                             tracked_order.last_state = order_status
                             if tracked_order.trade_type is TradeType.BUY:
                                 self.logger().info(
@@ -630,7 +685,7 @@ cdef class MexcExchange(ExchangeBase):
                             self.c_stop_tracking_order(tracked_order.client_order_id)
                             continue
 
-                        if order_status == "canceled":
+                        if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
                             tracked_order.last_state = order_status
                             self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
                                                f"according to order delta websocket API.")
@@ -679,7 +734,7 @@ cdef class MexcExchange(ExchangeBase):
         data = {
             'client_order_id': order_id,
             'order_type': order_type_str,
-            'side': "BID" if is_buy else "ASK",
+            'trade_type': "BID" if is_buy else "ASK",
             'symbol': convert_to_exchange_trading_pair(trading_pair),
             'quantity': str(amount),
             'price': str(price)
@@ -764,10 +819,11 @@ cdef class MexcExchange(ExchangeBase):
                    object order_type=OrderType.LIMIT,
                    object price=s_decimal_0,
                    dict kwargs={}):
+        print("c_buy")
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
-            str order_id = str(f"mexc-buy-{trading_pair}-{tracking_nonce}")
-
+            str order_id = str(f"buy-{trading_pair}-{tracking_nonce}")
+        print("order_id",order_id)
         safe_ensure_future(self.execute_buy(order_id, trading_pair, amount, order_type, price))
         return order_id
 
@@ -827,7 +883,7 @@ cdef class MexcExchange(ExchangeBase):
             self.logger().network(
                 f"Error submitting sell {order_type_str} order to Mexc for "
                 f"{decimal_amount} {trading_pair} "
-                f"{decimal_price if order_type is OrderType.LIMIT else ''}.",
+                f"{decimal_price if order_type is OrderType.LIMIT else ''}."
                 f"{decimal_price}." + ",ex:" + repr(ex),
                 exc_info=True,
                 app_warning_msg=f"Failed to submit sell order to Mexc. Check API key and network connection."
@@ -841,38 +897,35 @@ cdef class MexcExchange(ExchangeBase):
                     object order_type=OrderType.LIMIT,
                     object price=s_decimal_0,
                     dict kwargs={}):
+        print("mexc c_sell")
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
-            str order_id = str(f"mexc-sell-{trading_pair}-{tracking_nonce}")
+            str order_id = str(f"sell-{trading_pair}-{tracking_nonce}")
+        print("order_id",order_id)
 
         safe_ensure_future(self.execute_sell(order_id, trading_pair, amount, order_type, price))
         return order_id
 
-    async def execute_cancel(self, trading_pair: str, order_id: str):
+    async def execute_cancel(self, trading_pair: str, client_order_id: str):
         try:
-            tracked_order = self._in_flight_orders.get(order_id)
+            print("execute_cancel order_id",client_order_id)
+            tracked_order = self._in_flight_orders.get(client_order_id)
             if tracked_order is None:
-                raise ValueError(f"Failed to cancel order - {order_id}. Order not found.")
+                raise ValueError(f"Failed to cancel order - {client_order_id}. Order not found.")
 
             params = {
-                "client_order_ids": [order_id],
+                "client_order_ids": client_order_id,
             }
-            response = await self._api_request("POST", path_url=MEXC_ORDER_CANCEL, params=params, is_auth_required=True)
+            response = await self._api_request("DELETE", path_url=MEXC_ORDER_CANCEL, params=params, is_auth_required=True)
 
             if not response['code'] == 200:
                 raise MexcAPIError("Order could not be canceled")
 
         except MexcAPIError as ex:
             self.logger().network(
-                f"Failed to cancel order {order_id} : {repr(ex)}",
+                f"Failed to cancel order {client_order_id} : {repr(ex)}",
                 exc_info=True,
-                app_warning_msg=f"Failed to cancel the order {order_id} on Mexc. "
-                                f"Check API key and network connection."
-            )
-            self.logger().network(
-                f"Failed to cancel order {order_id}: {repr(ex)}",
-                exc_info=True,
-                app_warning_msg=f"Failed to cancel the order {order_id} on Mexc. "
+                app_warning_msg=f"Failed to cancel the order {client_order_id} on Mexc. "
                                 f"Check API key and network connection."
             )
 
@@ -880,7 +933,7 @@ cdef class MexcExchange(ExchangeBase):
             self.logger().network(
                 f"Failed to cancel order {order_id}: {repr(ex)}",
                 exc_info=True,
-                app_warning_msg=f"Failed to cancel the order {order_id} on OKEx. "
+                app_warning_msg=f"Failed to cancel the order {order_id} on Mexc. "
                                 f"Check API key and network connection."
             )
 
@@ -904,25 +957,31 @@ cdef class MexcExchange(ExchangeBase):
             params = {
                 'order_ids': quote(','.join([o for o in cancel_order_ids])),
             }
+            print("params,",params)
 
             cancellation_results = []
             try:
                 cancel_all_results = await self._api_request(
-                    "POST",
+                    "DELETE",
                     path_url=MEXC_ORDER_CANCEL,
                     params=params,
                     is_auth_required=True
                 )
 
-                for order_result in cancel_all_results['data']:
-                    cancellation_results.append(CancellationResult(order_result.key, order_result.value))
-                    if order_result.value == 'success':
-                        self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
-                                             OrderCancelledEvent(self._current_timestamp,
-                                                                 None,
-                                                                 exchange_order_id=order_result.key))
+                for order_result_client_order_id,order_result_value in cancel_all_results['data'].items():
+                    # print("cancel_all_results['data']", cancel_all_results['data'], "order_result", order_result)
+                    for o in orders_by_trading_pair[trading_pair]:
+                        if o.client_order_id == order_result_client_order_id:
+                            result_bool = True if  order_result_value == "invalid order state" or order_result_value == "success" else False
+                            cancellation_results.append(CancellationResult(o.exchange_order_id, result_bool))
+                            if result_bool == True:
+                                self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
+                                                     OrderCancelledEvent(self._current_timestamp,
+                                                                         None,
+                                                                         exchange_order_id=o.exchange_order_id))
 
             except Exception as ex:
+
                 self.logger().network(
                     f"Failed to cancel all orders: {cancel_order_ids}" + repr(ex),
                     exc_info=True,
@@ -968,6 +1027,8 @@ cdef class MexcExchange(ExchangeBase):
     cdef object c_get_order_price_quantum(self, str trading_pair, object price):
         cdef:
             TradingRule trading_rule = self._trading_rules[trading_pair]
+
+        # print("c_get_order_price_quantum",trading_rule.min_price_increment)
         return trading_rule.min_price_increment
 
     cdef object c_get_order_size_quantum(self, str trading_pair, object price):

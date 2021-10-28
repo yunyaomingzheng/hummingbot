@@ -74,7 +74,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     raise IOError(f"Error fetching active MEXC. HTTP status is {products_response.status}.")
 
                 data = await products_response.json()
-                print("fetch_trading_pairs:",data)
+                # print("fetch_trading_pairs:",data)
                 data = data['data']
 
                 trading_pairs = []
@@ -293,7 +293,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         await ws.send_str(json.dumps(subscribe_request))
 
                     async for raw_msg in self._inner_messages(ws):
-                        self.logger().warning("WebSocket receive_json ",raw_msg)
+                        # print("WebSocket receive_json ",raw_msg)
                         decoded_msg: dict = raw_msg
 
                         self.logger().debug("decode menssae:" + str(decoded_msg))

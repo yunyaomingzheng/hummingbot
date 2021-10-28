@@ -21,7 +21,7 @@ cdef class MexcInFlightOrder(InFlightOrderBase):
                  trade_type: TradeType,
                  price: Decimal,
                  amount: Decimal,
-                 initial_state: str = "live"):
+                 initial_state: str = "NEW"):
         super().__init__(
             client_order_id,
             exchange_order_id,
@@ -35,19 +35,19 @@ cdef class MexcInFlightOrder(InFlightOrderBase):
 
     @property
     def is_done(self) -> bool:
-        return self.last_state in {"filled", "canceled"}
+        return self.last_state in {"FILLED", "CANCELED","PARTIALLY_CANCELED"}
 
     @property
     def is_cancelled(self) -> bool:
-        return self.last_state in {"canceled"}
+        return self.last_state in {"CANCELED","PARTIALLY_CANCELED"}
 
     @property
     def is_failure(self) -> bool:
-        return self.last_state in {"canceled"}
+        return self.last_state in {"CANCELED","PARTIALLY_CANCELED"}
 
     @property
     def is_open(self) -> bool:
-        return self.last_state in {"live", "partially_filled"}
+        return self.last_state in {"NEW", "PARTIALLY_FILLED"}
 
     @classmethod
     def from_json(cls, data: Dict[str, Any]) -> InFlightOrderBase:

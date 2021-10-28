@@ -16,7 +16,7 @@ CENTRALIZED = True
 
 EXAMPLE_PAIR = 'BTC_USDT'
 
-DEFAULT_FEES = [0.1, 0.1]
+DEFAULT_FEES = [0.2, 0.2]
 
 KEYS = {
     "mexc_api_key":
