@@ -149,7 +149,6 @@ cdef class MexcExchange(ExchangeBase):
         self._user_stream_tracker = MexcUserStreamTracker(mexc_auth=self._mexc_auth,
                                                           trading_pairs=trading_pairs)
         MexcAPIOrderBookDataSource.api_key = mexc_api_key
-        getcontext().prec = 8
 
     @property
     def name(self) -> str:
