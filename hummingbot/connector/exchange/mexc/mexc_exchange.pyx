@@ -382,8 +382,8 @@ cdef class MexcExchange(ExchangeBase):
             try:
                 trading_rules.append(
                     TradingRule(trading_pair=convert_from_exchange_trading_pair(info['symbol']),
-                                min_order_size=Decimal(info["min_amount"]),
-                                max_order_size=Decimal(info["max_amount"]),
+                                # min_order_size=Decimal(info["min_amount"]),
+                                # max_order_size=Decimal(info["max_amount"]),
                                 min_price_increment=Decimal(mexc_utils.num_to_increment(info["price_scale"])),
                                 min_base_amount_increment=Decimal(mexc_utils.num_to_increment(info["quantity_scale"])),
                                 # min_quote_amount_increment=Decimal(info["1e-{info['value-precision']}"]),
@@ -776,6 +776,7 @@ cdef class MexcExchange(ExchangeBase):
         try:
             exchange_order_id = await self.place_order(order_id, trading_pair, decimal_amount, True, order_type,
                                                        decimal_price)
+            print("execute_buy amount" ,decimal_amount)
             self.c_start_tracking_order(
                 client_order_id=order_id,
                 exchange_order_id=exchange_order_id,
@@ -820,6 +821,7 @@ cdef class MexcExchange(ExchangeBase):
                    object price=s_decimal_0,
                    dict kwargs={}):
         print("c_buy")
+        print("c_buy",amount)
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
             str order_id = str(f"buy-{trading_pair}-{tracking_nonce}")
@@ -1064,6 +1066,7 @@ cdef class MexcExchange(ExchangeBase):
 
     def buy(self, trading_pair: str, amount: Decimal, order_type=OrderType.MARKET,
             price: Decimal = s_decimal_NaN, **kwargs) -> str:
+        print("buy amount" ,amount)
         return self.c_buy(trading_pair, amount, order_type, price, kwargs)
 
     def sell(self, trading_pair: str, amount: Decimal, order_type=OrderType.MARKET,

@@ -14,7 +14,7 @@ def num_to_increment(num):
 
 CENTRALIZED = True
 
-EXAMPLE_PAIR = 'BTC_USDT'
+EXAMPLE_PAIR = 'BTC-USDT'
 
 DEFAULT_FEES = [0.2, 0.2]
 

@@ -2,6 +2,9 @@
 import asyncio
 import json
 
+import aiohttp
+import aiohttp.client_ws
+
 import logging
 
 from typing import (
@@ -71,6 +74,71 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
             except Exception as ex:
                 return NetworkStatus.NOT_CONNECTED
             return NetworkStatus.CONNECTED
+
+    # async def none_listen_for_user_stream1(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
+    #     while True:
+    #         try:
+    #             session = aiohttp.ClientSession()
+    #             async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
+    #                 ws: aiohttp.client_ws.ClientWebSocketResponse = ws
+    #
+    #                 subscribe_request: Dict[str, Any] = {
+    #                     'api_key': access_key,
+    #                     "op": "sub.personal",
+    #                     'req_time': int(time.time() * 1000),
+    #                     "api_secret": secret_key,
+    #                 }
+    #
+    #                 params_sign = urlencode(params)
+    #                 sign_data = hashlib.md5(params_sign.encode()).hexdigest()
+    #                 del params['api_secret']
+    #                 params["sign"] = sign_data
+    #
+    #                 await ws.send_str(json.dumps(subscribe_request))
+    #
+    #                 async for raw_msg in self._inner_messages(ws):
+    #                     # print("WebSocket receive_json ",raw_msg)
+    #                     decoded_msg: dict = raw_msg
+    #
+    #                     self.logger().debug("decode menssae:" + str(decoded_msg))
+    #
+    #                     if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.deal':
+    #                         self.logger().debug(f"Recived new trade: {decoded_msg}")
+    #
+    #                         for data in decoded_msg['data']['deals']:
+    #                             # print("listen_for_trades ",data)
+    #                             trading_pair = convert_from_exchange_trading_pair(decoded_msg['symbol'])
+    #                             trade_message: OrderBookMessage = MexcOrderBook.trade_message_from_exchange(
+    #                                 data, data['t'], metadata={"trading_pair": trading_pair}
+    #                             )
+    #                             self.logger().debug(f'Putting msg in queue: {str(trade_message)}')
+    #                             # print("trade_message ", str(trade_message))
+    #                             output.put_nowait(trade_message)
+    #                     else:
+    #                         self.logger().debug(f"Unrecognized message received from MEXC websocket: {decoded_msg}")
+    #
+    #         except asyncio.CancelledError:
+    #             raise
+    #         except Exception:
+    #             self.logger().error("Unexpected error with WebSocket connection ,Retrying after 30 seconds...",
+    #                                 exc_info=True)
+    #             await asyncio.sleep(30.0)
+    #         finally:
+    #             await session.close()
+    #
+    # async def _inner_messages(self,
+    #                           ws: aiohttp.ClientWebSocketResponse) -> AsyncIterable[str]:
+    #     try:
+    #         while True:
+    #             msg: str = await asyncio.wait_for(ws.receive_json())
+    #             # self.logger().info("WebSocket msg ...",msg)
+    #             yield msg
+    #     except asyncio.TimeoutError:
+    #         return
+    #     except ConnectionClosed:
+    #         return
+    #     finally:
+    #         await ws.close()
 
     # async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
     #     """
