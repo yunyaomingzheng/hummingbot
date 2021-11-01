@@ -386,13 +386,14 @@ cdef class MexcExchange(ExchangeBase):
             try:
                 trading_rules.append(
                     TradingRule(trading_pair=convert_from_exchange_trading_pair(info['symbol']),
-                                min_order_size=Decimal(info["min_amount"]),
-                                max_order_size=Decimal(info["max_amount"]),
+                                # min_order_size=Decimal(info["min_amount"]),
+                                # max_order_size=Decimal(info["max_amount"]),
                                 min_price_increment=Decimal(mexc_utils.num_to_increment(info["price_scale"])),
                                 min_base_amount_increment=Decimal(mexc_utils.num_to_increment(info["quantity_scale"])),
                                 # min_quote_amount_increment=Decimal(info["1e-{info['value-precision']}"]),
                                 # min_notional_size=Decimal(info["min-order-value"])
-                                # min_notional_size=s_decimal_0  # Couldn't find a value for this in the docs
+                                min_notional_size=Decimal(info["min_amount"]),
+                                max_notional_size=Decimal(info["max_amount"]),
 
                                 )
                 )
@@ -769,8 +770,9 @@ cdef class MexcExchange(ExchangeBase):
         if not order_type.is_limit_type():
             raise Exception(f"Unsupported order type: {order_type}")
         print("execute_buy",amount,price)
-        decimal_amount = self.c_quantize_order_amount(trading_pair, amount)
+
         decimal_price = self.c_quantize_order_price(trading_pair, price)
+        decimal_amount = self.c_quantize_order_amount(trading_pair, amount, decimal_price)
         print("execute_buy2", decimal_amount, decimal_price)
         if decimal_amount < trading_rule.min_order_size:
             raise ValueError(f"Buy order amount {decimal_amount} is lower than the minimum order size "
@@ -848,8 +850,8 @@ cdef class MexcExchange(ExchangeBase):
         if not order_type.is_limit_type():
             raise Exception(f"Unsupported order type: {order_type}")
 
-        decimal_amount = self.c_quantize_order_amount(trading_pair, amount)
         decimal_price = self.c_quantize_order_price(trading_pair, price)
+        decimal_amount = self.c_quantize_order_amount(trading_pair, amount, decimal_price)
 
         if decimal_amount < trading_rule.min_order_size:
             raise ValueError(f"Sell order amount {decimal_amount} is lower than the minimum order size "
@@ -1048,19 +1050,25 @@ cdef class MexcExchange(ExchangeBase):
             object quantized_amount = ExchangeBase.c_quantize_order_amount(self, trading_pair, amount)
             object current_price = self.c_get_price(trading_pair, False)
             object notional_size
-        if quantized_amount < trading_rule.min_order_size:
-            return s_decimal_0
 
-        if quantized_amount > trading_rule.max_order_size:
-            return trading_rule.max_order_size
+        # if price != s_decimal_0:
+        #     amount = quantized_amount * price
+        #
+        #     if amount < trading_rule.min_order_size:
+        #         return s_decimal_0
+        #
+        #     if amount > trading_rule.max_order_size:
+        #         return trading_rule.max_order_size / price
 
-        if price == s_decimal_0:
-            notional_size = current_price * quantized_amount
-        else:
-            notional_size = price * quantized_amount
+        calc_price = current_price if price == s_decimal_0 else price
+
+        notional_size = calc_price * quantized_amount
 
         if notional_size < trading_rule.min_notional_size * Decimal("1.01"):
             return s_decimal_0
+
+        if notional_size > trading_rule.max_order_size:
+            return trading_rule.max_order_size / calc_price
 
         return quantized_amount
 
