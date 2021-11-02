@@ -148,8 +148,6 @@ cdef class MexcExchange(ExchangeBase):
         self._tx_tracker = MexcExchangeTransactionTracker(self)
         self._user_stream_tracker = MexcUserStreamTracker(mexc_auth=self._mexc_auth,
                                                           trading_pairs=trading_pairs)
-        MexcAPIOrderBookDataSource.api_key = mexc_api_key
-        getcontext().prec = 8
 
     @property
     def name(self) -> str:
@@ -393,7 +391,7 @@ cdef class MexcExchange(ExchangeBase):
                                 # min_quote_amount_increment=Decimal(info["1e-{info['value-precision']}"]),
                                 # min_notional_size=Decimal(info["min-order-value"])
                                 min_notional_size=Decimal(info["min_amount"]),
-                                max_notional_size=Decimal(info["max_amount"]),
+                                # max_notional_size=Decimal(info["max_amount"]),
 
                                 )
                 )
@@ -480,6 +478,9 @@ cdef class MexcExchange(ExchangeBase):
                                        f"order {tracked_order.client_order_id}.")
                     self.c_trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG, order_filled_event)
                 if order_status == "FILLED":
+                    client = await self._http_client()
+                    fee_paid = await self.get_deal_detail_fee(client, tracked_order.exchange_order_id)
+                    print("*************************exchange_order_id,", fee_paid)
                     tracked_order.last_state = order_status
                     if tracked_order.trade_type is TradeType.BUY:
                         self.logger().info(
@@ -612,13 +613,13 @@ cdef class MexcExchange(ExchangeBase):
         async for stream_message in self._iter_user_stream_queue():
             try:
                 #args = stream_message.get()
-                if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.account':  #判断是账户信息还是订单信息
+                if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.account':  #reserved,not use
                     # for k, balance in data.items():
                     #     self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
                     #     self._account_available_balances[k] = Decimal(balance['available'])
 
                     continue
-                elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':  #判断是账户信息还是订单信息
+                elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':  #order status
                     client_order_id = stream_message["data"]["clientOrderId"]
                     trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
                     order_status = stream_message["data"]["status"]
@@ -656,6 +657,10 @@ cdef class MexcExchange(ExchangeBase):
                                                               current_fee,
                                                               exchange_trade_id=order_id))
                     if order_status == "FILLED":
+                        client = await self._http_client()
+                        fee_paid = await self.get_deal_detail_fee(client,tracked_order.exchange_order_id)
+                        print("*************************exchange_order_id,",fee_paid)
+                        tracked_order.fee_paid = fee_paid
                         tracked_order.last_state = order_status
                         if tracked_order.trade_type is TradeType.BUY:
                             self.logger().info(
@@ -774,9 +779,8 @@ cdef class MexcExchange(ExchangeBase):
         decimal_price = self.c_quantize_order_price(trading_pair, price)
         decimal_amount = self.c_quantize_order_amount(trading_pair, amount, decimal_price)
         print("execute_buy2", decimal_amount, decimal_price)
-        if decimal_amount < trading_rule.min_order_size:
-            raise ValueError(f"Buy order amount {decimal_amount} is lower than the minimum order size "
-                             f"{trading_rule.min_order_size}.")
+        if decimal_price * decimal_amount < trading_rule.min_notional_size:
+            raise ValueError(f"Buy order amount {decimal_amount} is lower than the notional size ")
 
         try:
             exchange_order_id = await self.place_order(order_id, trading_pair, decimal_amount, True, order_type,
@@ -853,9 +857,8 @@ cdef class MexcExchange(ExchangeBase):
         decimal_price = self.c_quantize_order_price(trading_pair, price)
         decimal_amount = self.c_quantize_order_amount(trading_pair, amount, decimal_price)
 
-        if decimal_amount < trading_rule.min_order_size:
-            raise ValueError(f"Sell order amount {decimal_amount} is lower than the minimum order size "
-                             f"{trading_rule.min_order_size}.")
+        if decimal_price * decimal_amount < trading_rule.min_notional_size:
+            raise ValueError(f"Sell order amount {decimal_amount} is lower than the notional size ")
 
         try:
             exchange_order_id = await self.place_order(order_id, trading_pair, decimal_amount, False, order_type,
@@ -933,14 +936,6 @@ cdef class MexcExchange(ExchangeBase):
                 f"Failed to cancel order {client_order_id} : {repr(ex)}",
                 exc_info=True,
                 app_warning_msg=f"Failed to cancel the order {client_order_id} on Mexc. "
-                                f"Check API key and network connection."
-            )
-
-        except Exception as ex:
-            self.logger().network(
-                f"Failed to cancel order {order_id}: {repr(ex)}",
-                exc_info=True,
-                app_warning_msg=f"Failed to cancel the order {order_id} on Mexc. "
                                 f"Check API key and network connection."
             )
 
@@ -1067,8 +1062,8 @@ cdef class MexcExchange(ExchangeBase):
         if notional_size < trading_rule.min_notional_size * Decimal("1.01"):
             return s_decimal_0
 
-        if notional_size > trading_rule.max_order_size:
-            return trading_rule.max_order_size / calc_price
+        # if notional_size > trading_rule.max_order_size:
+        #     return trading_rule.max_order_size / calc_price
 
         return quantized_amount
 
@@ -1098,3 +1093,31 @@ cdef class MexcExchange(ExchangeBase):
 
     def get_order_book(self, trading_pair: str) -> OrderBook:
         return self.c_get_order_book(trading_pair)
+
+    async def get_deal_detail_fee(self,client: aiohttp.ClientSession, order_id: str) -> Dict[str, Any]:
+        params = {
+            'order_id': order_id,
+        }
+        # tick_url = MEXC_DEAL_DETAIL + f"?symbol={order_id}"
+        path_url = MEXC_BASE_URL + MEXC_DEAL_DETAIL
+        print("mexc get_deal_detail", path_url)
+        msg = await self._api_request("GET", params=params,path_url=path_url, is_auth_required=True)
+        balances: dict = {}
+        if msg['code'] == 200:
+            balances = msg['data']
+        else:
+            raise Exception(msg)
+        for order in balances:
+            fee += Decimal(order['fee'])
+        return fee
+        # async with client.get(url,params=params,ssl=ssl_context, proxy="http://127.0.0.1:1087") as response:
+        #     response: aiohttp.ClientResponse = response
+        #     if response.status != 200:
+        #         raise IOError(f"Error fetching MEXC deal detail for {order_id}. "
+        #                       f"HTTP status is {response.status}.")
+        #     api_data = await response.read()
+        #     data: List[Dict[str, Any]] = json.loads(api_data)['data']
+        #     fee = s_decimal_0
+        #     for order in data:
+        #         fee += Decimal(order['fee'])
+        #     return fee

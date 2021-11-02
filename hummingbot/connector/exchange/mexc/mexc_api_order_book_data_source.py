@@ -48,7 +48,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     _mexcaobds_logger: Optional[HummingbotLogger] = None
 
-    api_key = ""
 
     @classmethod
     def logger(cls) -> HummingbotLogger:
@@ -64,7 +63,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
             params: dict() = {}
-            # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
             print("mexc fetch_trading_pairs", url)
             async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
@@ -101,7 +99,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_last_traded_prices(cls, trading_pairs: List[str]) -> Dict[str, float]:
         async with aiohttp.ClientSession() as client:
             params: dict() = {}
-            # params.update({'api_key': mexc_meta.api_key})
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
             print("mexc get_last_traded_prices", url)
             async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
@@ -139,7 +136,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str) -> Dict[str, Any]:
         params = {}
         params: dict() = {}
-        # params.update({'api_key': mexc_meta.api_key})
         trading_pair = convert_to_exchange_trading_pair(trading_pair)
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
@@ -154,6 +150,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             data['ts'] = mexc_public.microseconds()
 
             return data
+
+
 
     @classmethod
     def iso_to_timestamp(cls, date: str):

@@ -24,6 +24,7 @@ MEXC_ORDER_DETAILS_URL = '/open/api/v2/order/query'
 MEXC_ORDER_CANCEL = '/open/api/v2/order/cancel'
 MEXC_BATCH_ORDER_CANCEL = '/open/api/v2/order/cancel'
 MEXC_BALANCE_URL = '/open/api/v2/account/info'
+MEXC_DEAL_DETAIL = '/open/api/v2/order/deal_detail'
 
 # WS
 MEXC_WS_URI_PUBLIC = 'wss://wbs.mexc.com/raw/ws'
