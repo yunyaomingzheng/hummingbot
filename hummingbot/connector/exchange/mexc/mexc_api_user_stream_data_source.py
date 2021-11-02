@@ -24,10 +24,10 @@ from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 
 import time
 
-import ssl
+
 
 from websockets.exceptions import ConnectionClosed
-
+import ssl
 ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 

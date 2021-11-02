@@ -73,8 +73,6 @@ ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 hm_logger = None
 s_decimal_0 = Decimal(0)
-TRADING_PAIR_SPLITTER = "-"
-CLIENT_ID_PREFIX = ''
 
 
 class MexcAPIError(IOError):
@@ -481,6 +479,7 @@ cdef class MexcExchange(ExchangeBase):
                     client = await self._http_client()
                     fee_paid = await self.get_deal_detail_fee(client, tracked_order.exchange_order_id)
                     print("***********123*******exchange_order_id,", fee_paid)
+                    tracked_order.fee_paid = fee_paid
                     tracked_order.last_state = order_status
                     if tracked_order.trade_type is TradeType.BUY:
                         self.logger().info(

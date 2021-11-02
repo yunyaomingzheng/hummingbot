@@ -38,7 +38,6 @@ from hummingbot.connector.exchange.mexc.constants import (
 
 from dateutil.parser import parse as dateparse
 import ssl
-
 ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 
