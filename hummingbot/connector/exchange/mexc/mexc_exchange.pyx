@@ -613,13 +613,13 @@ cdef class MexcExchange(ExchangeBase):
         async for stream_message in self._iter_user_stream_queue():
             try:
                 #args = stream_message.get()
-                if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.account':  #reserved,not use
+                if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':  #reserved,not use
                     # for k, balance in data.items():
                     #     self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
                     #     self._account_available_balances[k] = Decimal(balance['available'])
 
                     continue
-                elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':  #order status
+                elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':  #order status
                     client_order_id = stream_message["data"]["clientOrderId"]
                     trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
                     order_status = stream_message["data"]["status"]
@@ -630,13 +630,13 @@ cdef class MexcExchange(ExchangeBase):
                         continue
 
                     new_execute_amount_diff = s_decimal_0
-                    executed_amount = Decimal(data['quantity']) - Decimal(data['remainQuantity'])
-                    execute_price = data['price']
+                    executed_amount = Decimal(stream_message["data"]['quantity']) - Decimal(stream_message["data"]['remainQuantity'])
+                    execute_price = stream_message["data"]['price']
                     execute_amount_diff = executed_amount - tracked_order.executed_amount_base
                     if execute_amount_diff > s_decimal_0:
                         tracked_order.executed_amount_base = executed_amount
-                        tracked_order.executed_amount_quote = Decimal(data['amount']) - Decimal(
-                            data['remainAmount'])
+                        tracked_order.executed_amount_quote = Decimal(stream_message["data"]['amount']) - Decimal(
+                            stream_message["data"]['remainAmount'])
 
                         current_fee = self.get_fee(tracked_order.base_asset,
                                                    tracked_order.quote_asset,
@@ -655,7 +655,7 @@ cdef class MexcExchange(ExchangeBase):
                                                               execute_price,
                                                               execute_amount_diff,
                                                               current_fee,
-                                                              exchange_trade_id=order_id))
+                                                              exchange_trade_id=tracked_order.exchange_order_id))
                     if order_status == "FILLED":
                         client = await self._http_client()
                         fee_paid = await self.get_deal_detail_fee(client,tracked_order.exchange_order_id)

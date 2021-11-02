@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import asyncio
+import hashlib
 import json
+from urllib.parse import urlencode
 
 import aiohttp
 import aiohttp.client_ws
@@ -18,11 +20,18 @@ from typing import (
 import websockets
 
 from hummingbot.connector.exchange.mexc import constants
+from hummingbot.connector.exchange.mexc.mexc_exchange import MEXC_WS_URI_PUBLIC
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 
 import time
+
+import ssl
+
+from websockets.exceptions import ConnectionClosed
+
+ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 
 class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
@@ -50,38 +59,40 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
 
     async def _authenticate_client(self):
-        """
-        Sends an Authentication request to Mexc's WebSocket API Server
-        """
-        await self._websocket_connection.send(json.dumps(self._auth.generate_ws_auth()))
+        pass
+        # """
+        # Sends an Authentication request to Mexc's WebSocket API Server
+        # """
+        # await self._websocket_connection.send(json.dumps(self._auth.generate_ws_auth()))
+        #
+        # resp = await self._websocket_connection.recv()
+        # msg = json.loads(resp)
+        #
+        # if msg["event"] != 'login':
+        #     self.logger().error(f"Error occurred authenticating to websocket API server. {msg}")
+        #
+        # self.logger().info("Successfully authenticated")
 
-        resp = await self._websocket_connection.recv()
-        msg = json.loads(resp)
 
-        if msg["event"] != 'login':
-            self.logger().error(f"Error occurred authenticating to websocket API server. {msg}")
+    # async  def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
+    #     while True:
+    #         try:
+    #             await self._api_request(method="GET", path_url=MEXC_PING_URL)
+    #             self._last_recv_time = time.time()
+    #             await asyncio.sleep(8.0)
+    #         except asyncio.CancelledError:
+    #             raise
+    #         except Exception as ex:
+    #             self.logger().error(f"Unexpected error occurred! {ex}", exc_info=True)
 
-        self.logger().info("Successfully authenticated")
-
-    async  def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
-        while True:
-            try:
-                await self._api_request(method="GET", path_url=MEXC_PING_URL)
-                self._last_recv_time = time.time()
-                await asyncio.sleep(8.0)
-            except asyncio.CancelledError:
-                raise
-            except Exception as ex:
-                self.logger().error(f"Unexpected error occurred! {ex}", exc_info=True)
-
-    async def none_listen_for_user_stream1(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
+    async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
             try:
                 session = aiohttp.ClientSession()
                 async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
-                    subscribe_request: Dict[str, Any] = {
+                    params: Dict[str, Any] = {
                         'api_key': self._auth.api_key,
                         "op": "sub.personal",
                         'req_time': int(time.time() * 1000),
@@ -93,7 +104,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                     del params['api_secret']
                     params["sign"] = sign_data
 
-                    await ws.send_str(json.dumps(subscribe_request))
+                    await ws.send_str(json.dumps(params))
 
                     async for raw_msg in self._inner_messages(ws):
                         self._last_recv_time = time.time()
@@ -107,7 +118,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                             # )
                             # self.logger().debug(f'Putting msg in queue: {str(trade_message)}')
                             # print("trade_message ", str(trade_message))
-                            output.put_nowait(trade_message)
+                            output.put_nowait(decoded_msg)
                         elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'sub.personal':
                             pass
                         else:
