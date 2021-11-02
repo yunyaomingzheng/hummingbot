@@ -33,7 +33,7 @@ from hummingbot.connector.exchange.mexc.constants import (
     MEXC_SYMBOL_URL,
     MEXC_DEPTH_URL,
     MEXC_TICKERS_URL,
-    MEXC_WS_URI_PUBLIC, MEXC_BASE_URL,
+    MEXC_WS_URL_PUBLIC, MEXC_BASE_URL,
 )
 
 from dateutil.parser import parse as dateparse
@@ -64,7 +64,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         async with aiohttp.ClientSession() as client:
             params: dict() = {}
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
-            print("mexc fetch_trading_pairs", url)
+            # print("mexc fetch_trading_pairs", url)
             async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
@@ -83,7 +83,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     async def get_new_order_book(self, trading_pair: str) -> OrderBook:
         async with aiohttp.ClientSession() as client:
-            print("get_snapshot2")
+            # print("get_snapshot2")
             snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
 
             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
@@ -100,7 +100,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         async with aiohttp.ClientSession() as client:
             params: dict() = {}
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            print("mexc get_last_traded_prices", url)
+            # print("mexc get_last_traded_prices", url)
             async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -115,11 +115,11 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 for trading_pair in trading_pairs:
                     exchange_trading_pair = convert_to_exchange_trading_pair(trading_pair)
                     out[trading_pair] = float(all_markets['last'][exchange_trading_pair])
-                print("out",out)
+                # print("out",out)
                 return out
 
     async def get_trading_pairs(self) -> List[str]:
-        print("get_trading_pairs")
+        # print("get_trading_pairs")
         if not self._trading_pairs:
             try:
                 self._trading_pairs = await self.fetch_trading_pairs()
@@ -139,7 +139,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         trading_pair = convert_to_exchange_trading_pair(trading_pair)
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
-        print("mexc get_snapshot", url)
+        # print("mexc get_snapshot", url)
         async with client.get(url, ssl=ssl_context,proxy="http://127.0.0.1:1087") as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
@@ -162,7 +162,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     #     while True:
     #         try:
     #             trading_pairs: List[str] = self._trading_pairs
-    #             async with websockets.connect(MEXC_WS_URI_PUBLIC) as ws:
+    #             async with websockets.connect(MEXC_WS_URL_PUBLIC) as ws:
     #                 ws: websockets.WebSocketClientProtocol = ws
     #
     #                 for trading_pair in trading_pairs:
@@ -225,7 +225,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     #     while True:
     #         try:
     #             trading_pairs: List[str] = await  self.get_trading_pairs()
-    #             async with websockets.connect(MEXC_WS_URI_PUBLIC) as ws:
+    #             async with websockets.connect(MEXC_WS_URL_PUBLIC) as ws:
     #                 ws: websockets.WebSocketClientProtocol = ws
     #
     #                 for trading_pair in trading_pairs:
@@ -273,9 +273,9 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         while True:
             try:
                 trading_pairs: List[str] = self._trading_pairs
-                print("trading_pairs test :",trading_pairs)
+                # print("trading_pairs test :",trading_pairs)
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     for trading_pair in trading_pairs:
@@ -333,7 +333,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     self.logger().warning("WebSocket receive_json timeout ...")
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except asyncio.TimeoutError:
-            print("error")
+            # print("error")
             self.logger().warning("WebSocket ping timed out . Going to reconnect...")
             return
         except ConnectionClosed:
@@ -346,7 +346,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
                     for trading_pair in trading_pairs:
                         trading_pair = convert_to_exchange_trading_pair(trading_pair)

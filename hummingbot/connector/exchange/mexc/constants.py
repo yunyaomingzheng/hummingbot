@@ -27,8 +27,7 @@ MEXC_BALANCE_URL = '/open/api/v2/account/info'
 MEXC_DEAL_DETAIL = '/open/api/v2/order/deal_detail'
 
 # WS
-MEXC_WS_URI_PUBLIC = 'wss://wbs.mexc.com/raw/ws'
-# MEXC_WS_URI_PRIVATE = ""
+MEXC_WS_URL_PUBLIC = 'wss://wbs.mexc.com/raw/ws'
 
 MEXC_WS_CHANNEL_ACCOUNT = "account"
 MEXC_WS_CHANNEL_ORDERS = "orders"

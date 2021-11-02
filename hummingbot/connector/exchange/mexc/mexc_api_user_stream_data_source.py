@@ -17,10 +17,7 @@ from typing import (
     Any
 )
 
-import websockets
-
-from hummingbot.connector.exchange.mexc import constants
-from hummingbot.connector.exchange.mexc.mexc_exchange import MEXC_WS_URI_PUBLIC
+from hummingbot.connector.exchange.mexc.constants import MEXC_WS_URL_PUBLIC
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
@@ -36,7 +33,7 @@ ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     _mexcausds_logger: Optional[HummingbotLogger] = None
-
+    MESSAGE_TIMEOUT = 300.0
     @classmethod
     def logger(cls) -> HummingbotLogger:
         if cls._mexcausds_logger is None:
@@ -57,7 +54,6 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     def last_recv_time(self) -> float:
         return self._last_recv_time
 
-
     async def _authenticate_client(self):
         pass
         # """
@@ -73,7 +69,6 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
         #
         # self.logger().info("Successfully authenticated")
 
-
     # async  def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
     #     while True:
     #         try:
@@ -88,8 +83,9 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
             try:
+                print("listen_for_user_stream1", "wbsocket monitor")
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC, ssl=ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl=ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     params: Dict[str, Any] = {
@@ -98,7 +94,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                         'req_time': int(time.time() * 1000),
                         "api_secret": self._auth.secret_key,
                     }
-
+                    print("listen_for_user_stream", "wbsocket monitor")
                     params_sign = urlencode(params)
                     sign_data = hashlib.md5(params_sign.encode()).hexdigest()
                     del params['api_secret']
@@ -110,7 +106,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                         self._last_recv_time = time.time()
                         # print("WebSocket receive_json ",raw_msg)
                         decoded_msg: dict = raw_msg
-
+                        # print("WS订单信息", decoded_msg)
                         if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':
                             # trading_pair = convert_from_exchange_trading_pair(decoded_msg['symbol'])
                             # trade_message: OrderBookMessage = MexcOrderBook.trade_message_from_exchange(
@@ -126,8 +122,8 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                self.logger().error("Unexpected error with WebSocket connection ,Retrying after 30 seconds...",
+            except Exception as ex:
+                self.logger().error("Unexpected error with WebSocket connection ,Retrying after 30 seconds..." + str(ex),
                                     exc_info=True)
                 await asyncio.sleep(30.0)
             finally:
@@ -137,7 +133,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                               ws: aiohttp.ClientWebSocketResponse) -> AsyncIterable[str]:
         try:
             while True:
-                msg: str = await asyncio.wait_for(ws.receive_json())
+                msg: str = await asyncio.wait_for(ws.receive_json(), timeout=self.MESSAGE_TIMEOUT)
                 # self.logger().info("WebSocket msg ...",msg)
                 yield msg
         except asyncio.TimeoutError:

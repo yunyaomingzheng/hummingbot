@@ -63,7 +63,7 @@ from hummingbot.connector.exchange.mexc.constants import *
 
 from hummingbot.connector.exchange.mexc.mexc_public import (
     convert_to_exchange_trading_pair,
-    convert_from_exchange_trading_pair,
+    convert_from_exchange_trading_pair, ws_order_status_convert_to_str,
 )
 
 from decimal import *
@@ -210,7 +210,7 @@ cdef class MexcExchange(ExchangeBase):
         self._async_scheduler.stop()
 
     async def start_network(self):
-        print("mexc start_network")
+        # print("mexc start_network")
         self._stop_network()
         self._order_book_tracker.start()
         self._trading_rules_polling_task = safe_ensure_future(self._trading_rules_polling_loop())
@@ -357,7 +357,7 @@ cdef class MexcExchange(ExchangeBase):
         return estimate_fee("mexc", is_maker)
 
     async def _update_trading_rules(self):
-        print("_update_trading_rules")
+        # print("_update_trading_rules")
         cdef:
             int64_t last_tick = 0
             int64_t current_tick = 0
@@ -400,7 +400,7 @@ cdef class MexcExchange(ExchangeBase):
         return trading_rules
 
     async def get_order_status(self, exchangge_order_id: str, trading_pair: str) -> Dict[str, Any]:
-        print("get_order_status exchangge_order_id",exchangge_order_id)
+        # print("get_order_status exchangge_order_id",exchangge_order_id)
         params = {"order_ids": exchangge_order_id}
         msg = await self._api_request("GET",
                                       path_url=MEXC_ORDER_DETAILS_URL,
@@ -414,7 +414,7 @@ cdef class MexcExchange(ExchangeBase):
         cdef:
             int64_t last_tick = <int64_t> (self._last_poll_timestamp / self.UPDATE_ORDERS_INTERVAL)
             int64_t current_tick = <int64_t> (self._current_timestamp / self.UPDATE_ORDERS_INTERVAL)
-
+        print(" -------_update_order_status")
         tracked_orders = list(self._in_flight_orders.values())
         for tracked_order in tracked_orders:
             try:
@@ -444,7 +444,7 @@ cdef class MexcExchange(ExchangeBase):
                                         f"The order has either been filled or canceled."
                     )
                     continue
-                print("order status ",order_update)
+                print("-------------------order status ",order_update)
                 tracked_order.last_state = order_update['state']
                 order_status = order_update['state']
                 new_confirmed_amount = Decimal(order_update['deal_quantity'])
@@ -480,7 +480,7 @@ cdef class MexcExchange(ExchangeBase):
                 if order_status == "FILLED":
                     client = await self._http_client()
                     fee_paid = await self.get_deal_detail_fee(client, tracked_order.exchange_order_id)
-                    print("*************************exchange_order_id,", fee_paid)
+                    print("***********123*******exchange_order_id,", fee_paid)
                     tracked_order.last_state = order_status
                     if tracked_order.trade_type is TradeType.BUY:
                         self.logger().info(
@@ -510,6 +510,7 @@ cdef class MexcExchange(ExchangeBase):
                                                                      tracked_order.executed_amount_quote,
                                                                      tracked_order.fee_paid,
                                                                      tracked_order.order_type))
+                    print("_update_order_status", "filled c_stop_tracking_order")
                     self.c_stop_tracking_order(tracked_order.client_order_id)
                     continue
 
@@ -520,6 +521,7 @@ cdef class MexcExchange(ExchangeBase):
                     self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                          OrderCancelledEvent(self._current_timestamp,
                                                              tracked_order.client_order_id))
+                    print("_update_order_status", "cancel c_stop_tracking_order")
                     self.c_stop_tracking_order(tracked_order.client_order_id)
                 # if tracked_order.is_open:
                 #     continue
@@ -612,6 +614,7 @@ cdef class MexcExchange(ExchangeBase):
     async def _user_stream_event_listener(self):
         async for stream_message in self._iter_user_stream_queue():
             try:
+                # print("mexc_change _user_stream_event_listener")
                 #args = stream_message.get()
                 if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':  #reserved,not use
                     # for k, balance in data.items():
@@ -622,7 +625,7 @@ cdef class MexcExchange(ExchangeBase):
                 elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':  #order status
                     client_order_id = stream_message["data"]["clientOrderId"]
                     trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
-                    order_status = stream_message["data"]["status"]
+                    order_status = ws_order_status_convert_to_str(stream_message["data"]["status"]) # 1:NEW,2:FILLED,3:PARTIALLY_FILLED,4:CANCELED,5:PARTIALLY_CANCELED
 
                     tracked_order = self._in_flight_orders.get(client_order_id, None)
 
@@ -656,6 +659,7 @@ cdef class MexcExchange(ExchangeBase):
                                                               execute_amount_diff,
                                                               current_fee,
                                                               exchange_trade_id=tracked_order.exchange_order_id))
+                    print("WS订单信息123", stream_message)
                     if order_status == "FILLED":
                         client = await self._http_client()
                         fee_paid = await self.get_deal_detail_fee(client,tracked_order.exchange_order_id)
@@ -690,6 +694,7 @@ cdef class MexcExchange(ExchangeBase):
                                                                          tracked_order.executed_amount_quote,
                                                                          tracked_order.fee_paid,
                                                                          tracked_order.order_type))
+                        print("_user_stream_event_listener","filled c_stop_tracking_order")
                         self.c_stop_tracking_order(tracked_order.client_order_id)
                         continue
 
@@ -700,6 +705,7 @@ cdef class MexcExchange(ExchangeBase):
                         self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                              OrderCancelledEvent(self._current_timestamp,
                                                                  tracked_order.client_order_id))
+                        print("_user_stream_event_listener", "CANCELED c_stop_tracking_order")
                         self.c_stop_tracking_order(tracked_order.client_order_id)
 
                 else:
@@ -774,18 +780,18 @@ cdef class MexcExchange(ExchangeBase):
 
         if not order_type.is_limit_type():
             raise Exception(f"Unsupported order type: {order_type}")
-        print("execute_buy",amount,price)
+        # print("execute_buy",amount,price)
 
         decimal_price = self.c_quantize_order_price(trading_pair, price)
         decimal_amount = self.c_quantize_order_amount(trading_pair, amount, decimal_price)
-        print("execute_buy2", decimal_amount, decimal_price)
+        # print("execute_buy2", decimal_amount, decimal_price)
         if decimal_price * decimal_amount < trading_rule.min_notional_size:
             raise ValueError(f"Buy order amount {decimal_amount} is lower than the notional size ")
 
         try:
             exchange_order_id = await self.place_order(order_id, trading_pair, decimal_amount, True, order_type,
                                                        decimal_price)
-            print("execute_buy amount" ,decimal_amount)
+            # print("execute_buy amount" ,decimal_amount)
             self.c_start_tracking_order(
                 client_order_id=order_id,
                 exchange_order_id=exchange_order_id,
@@ -829,12 +835,12 @@ cdef class MexcExchange(ExchangeBase):
                    object order_type=OrderType.LIMIT,
                    object price=s_decimal_0,
                    dict kwargs={}):
-        print("c_buy")
-        print("c_buy",amount)
+        # print("c_buy")
+        # print("c_buy",amount)
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
             str order_id = str(f"buy-{trading_pair}-{tracking_nonce}")
-        print("order_id",order_id)
+        # print("order_id",order_id)
         safe_ensure_future(self.execute_buy(order_id, trading_pair, amount, order_type, price))
         return order_id
 
@@ -907,18 +913,18 @@ cdef class MexcExchange(ExchangeBase):
                     object order_type=OrderType.LIMIT,
                     object price=s_decimal_0,
                     dict kwargs={}):
-        print("mexc c_sell")
+        # print("mexc c_sell")
         cdef:
             int64_t tracking_nonce = <int64_t> get_tracking_nonce()
             str order_id = str(f"sell-{trading_pair}-{tracking_nonce}")
-        print("order_id",order_id)
+        # print("order_id",order_id)
 
         safe_ensure_future(self.execute_sell(order_id, trading_pair, amount, order_type, price))
         return order_id
 
     async def execute_cancel(self, trading_pair: str, client_order_id: str):
         try:
-            print("execute_cancel order_id",client_order_id)
+            # print("execute_cancel order_id",client_order_id)
             tracked_order = self._in_flight_orders.get(client_order_id)
             if tracked_order is None:
                 raise ValueError(f"Failed to cancel order - {client_order_id}. Order not found.")
@@ -959,7 +965,7 @@ cdef class MexcExchange(ExchangeBase):
             params = {
                 'order_ids': quote(','.join([o for o in cancel_order_ids])),
             }
-            print("params,",params)
+            # print("params,",params)
 
             cancellation_results = []
             try:
@@ -1072,7 +1078,7 @@ cdef class MexcExchange(ExchangeBase):
 
     def buy(self, trading_pair: str, amount: Decimal, order_type=OrderType.MARKET,
             price: Decimal = s_decimal_NaN, **kwargs) -> str:
-        print("buy amount" ,amount)
+        # print("buy amount" ,amount)
         return self.c_buy(trading_pair, amount, order_type, price, kwargs)
 
     def sell(self, trading_pair: str, amount: Decimal, order_type=OrderType.MARKET,
