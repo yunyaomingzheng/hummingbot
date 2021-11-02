@@ -1099,10 +1099,10 @@ cdef class MexcExchange(ExchangeBase):
             'order_id': order_id,
         }
         # tick_url = MEXC_DEAL_DETAIL + f"?symbol={order_id}"
-        path_url = MEXC_BASE_URL + MEXC_DEAL_DETAIL
-        print("mexc get_deal_detail", path_url)
-        msg = await self._api_request("GET", params=params,path_url=path_url, is_auth_required=True)
-        balances: dict = {}
+        # print("mexc get_deal_detail", MEXC_DEAL_DETAIL)
+        msg = await self._api_request("GET", path_url=MEXC_DEAL_DETAIL,params=params, is_auth_required=True)
+        balances: list = []
+        fee = s_decimal_0
         if msg['code'] == 200:
             balances = msg['data']
         else:
