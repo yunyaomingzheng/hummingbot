@@ -481,6 +481,7 @@ cdef class MexcExchange(ExchangeBase):
                     print("***********123*******exchange_order_id,", fee_paid)
                     tracked_order.fee_paid = fee_paid
                     tracked_order.last_state = order_status
+                    self.c_stop_tracking_order(tracked_order.client_order_id)
                     if tracked_order.trade_type is TradeType.BUY:
                         self.logger().info(
                             f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
@@ -510,18 +511,18 @@ cdef class MexcExchange(ExchangeBase):
                                                                      tracked_order.fee_paid,
                                                                      tracked_order.order_type))
                     print("_update_order_status", "filled c_stop_tracking_order")
-                    self.c_stop_tracking_order(tracked_order.client_order_id)
+
                     continue
 
                 if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
                     tracked_order.last_state = order_status
+                    self.c_stop_tracking_order(tracked_order.client_order_id)
                     self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
                                        f"according to order delta websocket API.")
                     self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                          OrderCancelledEvent(self._current_timestamp,
                                                              tracked_order.client_order_id))
                     print("_update_order_status", "cancel c_stop_tracking_order")
-                    self.c_stop_tracking_order(tracked_order.client_order_id)
                 # if tracked_order.is_open:
                 #     continue
                 #
