@@ -15,7 +15,6 @@ from hummingbot.core.utils.async_utils import (
     safe_gather,
 )
 
-from hummingbot.connector.exchange.mexc.mexc_api_order_book_data_source import MexcAPIOrderBookDataSource
 from hummingbot.connector.exchange.mexc.mexc_api_user_stream_data_source import MexcAPIUserStreamDataSource
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 

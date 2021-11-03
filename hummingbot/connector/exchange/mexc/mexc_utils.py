@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-import math
 from decimal import Decimal
 
-from enum import Enum
 from hummingbot.client.config.config_var import ConfigVar
 from hummingbot.client.config.config_methods import using_exchange
-import zlib
 
 
 def num_to_increment(num):
@@ -32,5 +29,4 @@ KEYS = {
                   required_if=using_exchange("mexc"),
                   is_secure=True,
                   is_connect_key=True),
-
 }
