@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 import math
+from decimal import Decimal
 
 from enum import Enum
 from hummingbot.client.config.config_var import ConfigVar
@@ -9,7 +10,7 @@ import zlib
 
 
 def num_to_increment(num):
-    return math.pow(10, -num)
+    return Decimal(10) ** -num
 
 
 CENTRALIZED = True
