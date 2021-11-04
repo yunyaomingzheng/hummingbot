@@ -2,9 +2,6 @@
 import logging
 from os.path import join, realpath
 
-import aiohttp
-
-
 from test.connector.exchange.mexc.fixture_mexc import FixtureMEXC
 from hummingbot.logger.struct_logger import METRICS_LOG_LEVEL
 
