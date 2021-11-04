@@ -39,7 +39,7 @@ from hummingbot.core.utils.async_utils import (
     safe_ensure_future,
     safe_gather,
 )
-from urllib.parse import quote, urljoin
+from lib.parse import quote, urljoin
 
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
@@ -281,7 +281,7 @@ cdef class MexcExchange(ExchangeBase):
             headers=headers,
             # params=params if params else None, #mexc`s params  is already in the url
             data=text_data,
-            proxy="http://127.0.0.1:1087",
+            # proxy="http://127.0.0.1:1087",
             ssl_context=ssl_context
         )
 
