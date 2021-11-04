@@ -3,7 +3,6 @@
 import unittest
 
 from hummingbot.connector.exchange.mexc.mexc_order_book import MexcOrderBookMessage
-from hummingbot.connector.exchange.mexc.mexc_api_order_book_data_source import MexcAPIOrderBookDataSource
 from unittest import mock
 import asyncio
 import aiohttp
@@ -11,9 +10,7 @@ from typing import (
     Any,
     Dict,
 )
-from aiohttp_socks import ProxyConnector
 from hummingbot.connector.exchange.mexc.mexc_api_order_book_data_source import MexcAPIOrderBookDataSource
-from hummingbot.connector.exchange.mexc.mexc_public import convert_to_exchange_trading_pair
 
 trading_pairs = ['EOS-USDT', 'BTC-USDT']
 

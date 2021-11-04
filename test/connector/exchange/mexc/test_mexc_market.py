@@ -58,7 +58,6 @@ from hummingbot.connector.exchange.mexc.constants import (
     MEXC_BASE_URL,
     MEXC_PING_URL,
     MEXC_SYMBOL_URL,
-    MEXC_TICKERS_URL,
     MEXC_DEPTH_URL,
     MEXC_PRICE_URL,
     MEXC_PLACE_ORDER,
@@ -483,7 +482,7 @@ class MexcExchangeUnitTest(unittest.TestCase):
             self.market: MexcExchange = MexcExchange(
                 API_KEY,
                 API_SECRET,
-                trading_pairs=["ETH-USDT", "BTC-USDT"]
+                trading_pairs=["ETH-USDT"]
             )
             for event_tag in self.events:
                 self.market.add_listener(event_tag, self.market_logger)
