@@ -58,7 +58,7 @@ from hummingbot.connector.exchange.mexc.constants import *
 
 from hummingbot.connector.exchange.mexc.mexc_public import (
     convert_to_exchange_trading_pair,
-    convert_from_exchange_trading_pair, ws_order_status_convert_to_str,ssl_context
+    convert_from_exchange_trading_pair, ws_order_status_convert_to_str, ssl_context
 )
 
 from decimal import *
