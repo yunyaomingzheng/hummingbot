@@ -24,7 +24,7 @@ class FixtureMEXC:
         "code": 200,
         "data": [
             {
-                "symbol": "ETH-USDT",
+                "symbol": "ETH_USDT",
                 "volume": "0",
                 "high": "182.4117576",
                 "low": "182.4117576",
@@ -42,7 +42,7 @@ class FixtureMEXC:
         "code": 200,
         "data": [
             {
-                "symbol": "ETH-USDT",
+                "symbol": "ETH_USDT",
                 "state": "ENABLED",
                 "vcoinName": "ETH",
                 "vcoinStatus": 1,
