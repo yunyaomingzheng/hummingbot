@@ -58,14 +58,10 @@ from hummingbot.connector.exchange.mexc.constants import *
 
 from hummingbot.connector.exchange.mexc.mexc_public import (
     convert_to_exchange_trading_pair,
-    convert_from_exchange_trading_pair, ws_order_status_convert_to_str,
+    convert_from_exchange_trading_pair, ws_order_status_convert_to_str,ssl_context
 )
 
 from decimal import *
-
-import ssl
-
-ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 hm_logger = None
 s_decimal_0 = Decimal(0)

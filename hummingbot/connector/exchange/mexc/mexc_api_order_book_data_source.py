@@ -54,7 +54,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
-            async with client.get(url) as products_response:
+            async with client.get(url, ssl=mexc_public.ssl_context) as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -86,7 +86,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_last_traded_prices(cls, trading_pairs: List[str]) -> Dict[str, float]:
         async with aiohttp.ClientSession() as client:
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            async with client.get(url) as products_response:
+            async with client.get(url, ssl=mexc_public.ssl_context) as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -120,7 +120,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         trading_pair = convert_to_exchange_trading_pair(trading_pair)
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
-        async with client.get(url) as response:
+        async with client.get(url, ssl=mexc_public.ssl_context) as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
@@ -141,7 +141,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = self._trading_pairs
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_public.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     for trading_pair in trading_pairs:
@@ -203,7 +203,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_public.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
                     for trading_pair in trading_pairs:
                         trading_pair = convert_to_exchange_trading_pair(trading_pair)

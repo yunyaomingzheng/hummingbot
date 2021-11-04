@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
+
 import time
+
+import ssl
+
+ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
 
 ws_status = {
     1: 'NEW',

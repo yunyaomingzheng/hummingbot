@@ -17,6 +17,7 @@ from typing import (
     Any
 )
 
+from hummingbot.connector.exchange.mexc import mexc_public
 from hummingbot.connector.exchange.mexc.constants import MEXC_WS_URL_PUBLIC
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
@@ -30,6 +31,7 @@ from websockets.exceptions import ConnectionClosed
 class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     _mexcausds_logger: Optional[HummingbotLogger] = None
     MESSAGE_TIMEOUT = 300.0
+
     @classmethod
     def logger(cls) -> HummingbotLogger:
         if cls._mexcausds_logger is None:
@@ -52,24 +54,12 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
     async def _authenticate_client(self):
         pass
-        # """
-        # Sends an Authentication request to Mexc's WebSocket API Server
-        # """
-        # await self._websocket_connection.send(json.dumps(self._auth.generate_ws_auth()))
-        #
-        # resp = await self._websocket_connection.recv()
-        # msg = json.loads(resp)
-        #
-        # if msg["event"] != 'login':
-        #     self.logger().error(f"Error occurred authenticating to websocket API server. {msg}")
-        #
-        # self.logger().info("Successfully authenticated")
 
     async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
             try:
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_public.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     params: Dict[str, Any] = {
