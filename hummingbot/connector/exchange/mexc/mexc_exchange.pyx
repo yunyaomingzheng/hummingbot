@@ -281,7 +281,6 @@ cdef class MexcExchange(ExchangeBase):
             headers=headers,
             # params=params if params else None, #mexc`s params  is already in the url
             data=text_data,
-            # proxy="http://127.0.0.1:1087",
             ssl_context=ssl_context
         )
 
