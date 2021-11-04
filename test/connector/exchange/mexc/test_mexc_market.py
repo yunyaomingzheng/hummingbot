@@ -107,15 +107,6 @@ class MexcExchangeUnitTest(unittest.TestCase):
         return url.split(HOST)[-1]
 
     @classmethod
-    async def myrequest(cls):
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://" + str(cls.web_app.host) + ":" + str(
-                    cls.web_app.port) + "/" + API_BASE_URL + cls.strip_host_from_mexc_url(MEXC_DEPTH_URL).format(
-                    trading_pair='ETH-USDT'), timeout=5) as resp:
-                r = await resp.text()
-                print(r)
-
-    @classmethod
     def setUpClass(cls):
         cls.ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
         if MOCK_API_ENABLED:
@@ -137,9 +128,6 @@ class MexcExchangeUnitTest(unittest.TestCase):
             cls.web_app.update_response("get", API_BASE_URL, MEXC_BALANCE_URL, FixtureMEXC.MEXC_BALANCE_URL)
             cls.web_app.update_response("get", API_BASE_URL, MEXC_DEAL_DETAIL, FixtureMEXC.ORDER_DEAL_DETAIL)
             cls.web_app.update_response("get", API_BASE_URL, MEXC_PING_URL, FixtureMEXC.PING_DATA)
-
-            cls.ev_loop.run_until_complete(cls.myrequest())
-
             cls._t_nonce_patcher = unittest.mock.patch(
                 "hummingbot.connector.exchange.mexc.mexc_exchange.get_tracking_nonce")
             cls._t_nonce_mock = cls._t_nonce_patcher.start()
