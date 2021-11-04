@@ -39,7 +39,7 @@ from hummingbot.core.utils.async_utils import (
     safe_ensure_future,
     safe_gather,
 )
-from lib.parse import quote, urljoin
+from urllib.parse import quote, urljoin
 
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
@@ -482,7 +482,6 @@ cdef class MexcExchange(ExchangeBase):
                     self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                          OrderCancelledEvent(self._current_timestamp,
                                                              tracked_order.client_order_id))
-                    print("_update_order_status", "cancel c_stop_tracking_order")
             except Exception as ex:
                 self.logger().error("_update_order_status error ..." + repr(ex), exc_info=True)
 
@@ -616,7 +615,6 @@ cdef class MexcExchange(ExchangeBase):
                         self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                              OrderCancelledEvent(self._current_timestamp,
                                                                  tracked_order.client_order_id))
-                        print("_user_stream_event_listener", "CANCELED c_stop_tracking_order")
                         self.c_stop_tracking_order(tracked_order.client_order_id)
 
                 else:
