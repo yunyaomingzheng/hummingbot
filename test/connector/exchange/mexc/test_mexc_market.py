@@ -3,7 +3,7 @@ import logging
 from os.path import join, realpath
 
 import aiohttp
-import sys;sys.path.insert(0, realpath(join(__file__, "../../../../../")))
+
 
 from test.connector.exchange.mexc.fixture_mexc import FixtureMEXC
 from hummingbot.logger.struct_logger import METRICS_LOG_LEVEL
@@ -66,14 +66,15 @@ from hummingbot.connector.exchange.mexc.constants import (
     MEXC_BATCH_ORDER_CANCEL,
     MEXC_BALANCE_URL, MEXC_DEAL_DETAIL,
 )
+import sys
+
+sys.path.insert(0, realpath(join(__file__, "../../../../../")))
 
 # MOCK_API_ENABLED = conf.mock_api_enabled is not None and conf.mock_api_enabled.lower() in ['true', 'yes', '1']
 MOCK_API_ENABLED = True
 
-
 API_KEY = "API_PASSPHRASE_MOCK" if MOCK_API_ENABLED else conf.mexc_api_key
 API_SECRET = "API_SECRET_MOCK" if MOCK_API_ENABLED else conf.mexc_secret_key
-
 
 API_BASE_URL = MEXC_BASE_URL.replace("https://", "").replace("/", "")
 
@@ -108,7 +109,9 @@ class MexcExchangeUnitTest(unittest.TestCase):
     @classmethod
     async def myrequest(cls):
         async with aiohttp.ClientSession() as session:
-            async with session.get("http://" + str(cls.web_app.host) + ":" + str(cls.web_app.port) + "/" + API_BASE_URL + cls.strip_host_from_mexc_url(MEXC_DEPTH_URL).format(trading_pair='ETH-USDT'), timeout=5) as resp:
+            async with session.get("http://" + str(cls.web_app.host) + ":" + str(
+                    cls.web_app.port) + "/" + API_BASE_URL + cls.strip_host_from_mexc_url(MEXC_DEPTH_URL).format(
+                    trading_pair='ETH-USDT'), timeout=5) as resp:
                 r = await resp.text()
                 print(r)
 
@@ -124,9 +127,12 @@ class MexcExchangeUnitTest(unittest.TestCase):
             cls._url_mock = cls._patcher.start()
             cls._url_mock.side_effect = cls.web_app.reroute_local
 
-            cls.web_app.update_response("get", API_BASE_URL, cls.strip_host_from_mexc_url(MEXC_SYMBOL_URL), FixtureMEXC.MEXC_MARKET_SYMBOL)
-            cls.web_app.update_response("get", API_BASE_URL, MEXC_PRICE_URL.split("?")[:1][0], FixtureMEXC.MEXC_TICKERS, params={"symbol": "ETH-USDT"})
-            cls.web_app.update_response("get", API_BASE_URL, MEXC_DEPTH_URL.split("?")[:1][0], FixtureMEXC.MEXC_ORDER_BOOK, params={"symbol": "ETH-USDT", "depth": 200})
+            cls.web_app.update_response("get", API_BASE_URL, cls.strip_host_from_mexc_url(MEXC_SYMBOL_URL),
+                                        FixtureMEXC.MEXC_MARKET_SYMBOL)
+            cls.web_app.update_response("get", API_BASE_URL, MEXC_PRICE_URL.split("?")[:1][0], FixtureMEXC.MEXC_TICKERS,
+                                        params={"symbol": "ETH-USDT"})
+            cls.web_app.update_response("get", API_BASE_URL, MEXC_DEPTH_URL.split("?")[:1][0],
+                                        FixtureMEXC.MEXC_ORDER_BOOK, params={"symbol": "ETH-USDT", "depth": 200})
             # cls.web_app.update_response("get", API_BASE_URL, MEXC_TICKERS_URL, FixtureMEXC.MEXC_TICKERS)
             cls.web_app.update_response("get", API_BASE_URL, MEXC_BALANCE_URL, FixtureMEXC.MEXC_BALANCE_URL)
             cls.web_app.update_response("get", API_BASE_URL, MEXC_DEAL_DETAIL, FixtureMEXC.ORDER_DEAL_DETAIL)
@@ -134,8 +140,8 @@ class MexcExchangeUnitTest(unittest.TestCase):
 
             cls.ev_loop.run_until_complete(cls.myrequest())
 
-
-            cls._t_nonce_patcher = unittest.mock.patch("hummingbot.connector.exchange.mexc.mexc_exchange.get_tracking_nonce")
+            cls._t_nonce_patcher = unittest.mock.patch(
+                "hummingbot.connector.exchange.mexc.mexc_exchange.get_tracking_nonce")
             cls._t_nonce_mock = cls._t_nonce_patcher.start()
         cls.clock: Clock = Clock(ClockMode.REALTIME)
         cls.market: MexcExchange = MexcExchange(
@@ -149,7 +155,7 @@ class MexcExchangeUnitTest(unittest.TestCase):
             API_SECRET,
             trading_pairs=["ETH-USDT"]
         )
-        a = cls.market
+        # a = cls.market
         cls.clock.add_iterator(cls.market)
         cls.clock.add_iterator(cls.market_2)
         cls.stack = contextlib.ExitStack()
@@ -220,16 +226,20 @@ class MexcExchangeUnitTest(unittest.TestCase):
 
     def test_fee_overrides_config(self):
         fee_overrides_config_map["mexc_taker_fee"].value = None
-        taker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1), Decimal('0.1'))
+        taker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1),
+                                                  Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.002"), taker_fee.percent)
         fee_overrides_config_map["mexc_taker_fee"].value = Decimal('0.1')
-        taker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1), Decimal('0.1'))
+        taker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT, TradeType.BUY, Decimal(1),
+                                                  Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.001"), taker_fee.percent)
         fee_overrides_config_map["mexc_maker_fee"].value = None
-        maker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1), Decimal('0.1'))
+        maker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
+                                                  Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.002"), maker_fee.percent)
         fee_overrides_config_map["mexc_maker_fee"].value = Decimal('0.5')
-        maker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1), Decimal('0.1'))
+        maker_fee: TradeFee = self.market.get_fee("LINK", "ETH", OrderType.LIMIT_MAKER, TradeType.BUY, Decimal(1),
+                                                  Decimal('0.1'))
         self.assertAlmostEqual(Decimal("0.005"), maker_fee.percent)
 
     def place_order(self, is_buy, trading_pair, amount, order_type, price, nonce, get_resp, market_connector=None):
@@ -254,7 +264,9 @@ class MexcExchangeUnitTest(unittest.TestCase):
             # resp is the response passed by parameter
             resp["data"][0]["id"] = exch_order_id
             resp["data"][0]["client_order_id"] = order_id
-            self.web_app.update_response("get", API_BASE_URL, MEXC_ORDER_DETAILS_URL.format(ordId=exch_order_id, trading_pair="ETH-USDT"), resp)
+            self.web_app.update_response("get", API_BASE_URL,
+                                         MEXC_ORDER_DETAILS_URL.format(ordId=exch_order_id, trading_pair="ETH-USDT"),
+                                         resp)
         return order_id, exch_order_id
 
     def cancel_order(self, trading_pair, order_id, exchange_order_id, get_resp):
@@ -269,7 +281,9 @@ class MexcExchangeUnitTest(unittest.TestCase):
             resp = get_resp.copy()
             resp["data"][0]["id"] = exchange_order_id
             resp["data"][0]["client_order_id"] = order_id
-            self.web_app.update_response("get", API_BASE_URL, MEXC_ORDER_DETAILS_URL.format(ordId=exchange_order_id, trading_pair="ETH-USDT"), resp)
+            self.web_app.update_response("get", API_BASE_URL, MEXC_ORDER_DETAILS_URL.format(ordId=exchange_order_id,
+                                                                                            trading_pair="ETH-USDT"),
+                                         resp)
 
     def test_limit_maker_rejections(self):
         if MOCK_API_ENABLED:
@@ -311,13 +325,15 @@ class MexcExchangeUnitTest(unittest.TestCase):
         quantize_bid_price: Decimal = self.market.quantize_order_price(trading_pair, bid_price * Decimal("0.9"))
         quantize_ask_price: Decimal = self.market.quantize_order_price(trading_pair, ask_price * Decimal("1.1"))
 
-        order_id1, exch_order_id1 = self.place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER, quantize_bid_price,
+        order_id1, exch_order_id1 = self.place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
+                                                     quantize_bid_price,
                                                      10001, FixtureMEXC.ORDER_GET_LIMIT_BUY_UNFILLED)
         [order_created_event] = self.run_parallel(self.market_logger.wait_for(BuyOrderCreatedEvent))
         order_created_event: BuyOrderCreatedEvent = order_created_event
         self.assertEqual(order_id1, order_created_event.order_id)
 
-        order_id2, exch_order_id2 = self.place_order(False, trading_pair, quantized_amount, OrderType.LIMIT_MAKER, quantize_ask_price,
+        order_id2, exch_order_id2 = self.place_order(False, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
+                                                     quantize_ask_price,
                                                      10002, FixtureMEXC.ORDER_GET_LIMIT_SELL_UNFILLED)
         [order_created_event] = self.run_parallel(self.market_logger.wait_for(SellOrderCreatedEvent))
         order_created_event: BuyOrderCreatedEvent = order_created_event
@@ -419,9 +435,11 @@ class MexcExchangeUnitTest(unittest.TestCase):
         quantize_bid_price: Decimal = self.market_2.quantize_order_price(trading_pair, bid_price * Decimal("0.9"))
         quantize_ask_price: Decimal = self.market_2.quantize_order_price(trading_pair, ask_price * Decimal("1.1"))
 
-        _, exch_order_id1 = self.place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER, quantize_bid_price,
+        _, exch_order_id1 = self.place_order(True, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
+                                             quantize_bid_price,
                                              1001, FixtureMEXC.ORDER_GET_LIMIT_BUY_UNFILLED, self.market_2)
-        _, exch_order_id2 = self.place_order(False, trading_pair, quantized_amount, OrderType.LIMIT_MAKER, quantize_ask_price,
+        _, exch_order_id2 = self.place_order(False, trading_pair, quantized_amount, OrderType.LIMIT_MAKER,
+                                             quantize_ask_price,
                                              1002, FixtureMEXC.ORDER_GET_LIMIT_BUY_FILLED, self.market_2)
         self.run_parallel(asyncio.sleep(1))
         if MOCK_API_ENABLED:
@@ -499,9 +517,9 @@ class MexcExchangeUnitTest(unittest.TestCase):
 
             # Cancel the order and verify that the change is saved.
             self.cancel_order(trading_pair, order_id, exch_order_id, FixtureMEXC.ORDER_GET_CANCELED)
-            saved_market_states2 = recorder.get_market_states(config_path, self.market)
+            # saved_market_states2 = recorder.get_market_states(config_path, self.market)
             self.run_parallel(self.market_logger.wait_for(OrderCancelledEvent))
-            saved_market_states3 = recorder.get_market_states(config_path, self.market)
+            # saved_market_states3 = recorder.get_market_states(config_path, self.market)
             order_id = None
             self.assertEqual(0, len(self.market.limit_orders))
             self.assertEqual(0, len(self.market.tracking_states))
