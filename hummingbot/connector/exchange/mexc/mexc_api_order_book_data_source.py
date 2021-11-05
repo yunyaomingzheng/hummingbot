@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import aiohttp
 import aiohttp.client_ws
 import asyncio
@@ -16,8 +15,8 @@ from typing import (
     Optional,
 )
 from websockets.exceptions import ConnectionClosed
-from hummingbot.connector.exchange.mexc import mexc_public
-from hummingbot.connector.exchange.mexc.mexc_public import (
+from hummingbot.connector.exchange.mexc import mexc_utils
+from hummingbot.connector.exchange.mexc.mexc_utils import (
     convert_from_exchange_trading_pair,
     convert_to_exchange_trading_pair
 )
@@ -30,9 +29,8 @@ from hummingbot.connector.exchange.mexc.constants import (
     MEXC_SYMBOL_URL,
     MEXC_DEPTH_URL,
     MEXC_TICKERS_URL,
-    MEXC_WS_URI_PUBLIC, MEXC_BASE_URL,
+    MEXC_WS_URL_PUBLIC, MEXC_BASE_URL,
 )
-
 from dateutil.parser import parse as dateparse
 
 
@@ -56,7 +54,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
             url = MEXC_BASE_URL + MEXC_SYMBOL_URL
-            async with client.get(url) as products_response:
+            async with client.get(url, ssl=mexc_utils.ssl_context) as products_response:
 
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
@@ -78,7 +76,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
                 snapshot,
                 trading_pair,
-                timestamp=mexc_public.microseconds(),
+                timestamp=mexc_utils.microseconds(),
                 metadata={"trading_pair": trading_pair})
             order_book: OrderBook = self.order_book_create_function()
             order_book.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
@@ -88,7 +86,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_last_traded_prices(cls, trading_pairs: List[str]) -> Dict[str, float]:
         async with aiohttp.ClientSession() as client:
             url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            async with client.get(url) as products_response:
+            async with client.get(url, ssl=mexc_utils.ssl_context) as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -122,14 +120,15 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         trading_pair = convert_to_exchange_trading_pair(trading_pair)
         tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
         url = MEXC_BASE_URL + tick_url
-        async with client.get(url) as response:
+        async with client.get(url, ssl=mexc_utils.ssl_context) as response:
             response: aiohttp.ClientResponse = response
             if response.status != 200:
                 raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
                               f"HTTP status is {response.status}.")
             api_data = await response.read()
             data: Dict[str, Any] = json.loads(api_data)['data']
-            data['ts'] = mexc_public.microseconds()
+            data['ts'] = mexc_utils.microseconds()
+
             return data
 
     @classmethod
@@ -142,7 +141,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = self._trading_pairs
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     for trading_pair in trading_pairs:
@@ -186,10 +185,10 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             while True:
                 try:
                     msg: str = await asyncio.wait_for(ws.receive_json(), timeout=self.MESSAGE_TIMEOUT)
-                    # self.logger().info("WebSocket msg ...",msg)
                     yield msg
                 except asyncio.TimeoutError:
                     pong_waiter = ws.ping()
+                    self.logger().warning("WebSocket receive_json timeout ...")
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except asyncio.TimeoutError:
             self.logger().warning("WebSocket ping timed out . Going to reconnect...")
@@ -204,7 +203,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URI_PUBLIC) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
                     for trading_pair in trading_pairs:
                         trading_pair = convert_to_exchange_trading_pair(trading_pair)
@@ -236,7 +235,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                                     for bid in decoded_msg["data"]["bids"]]
                                 decoded_msg['data']['bids'] = bids
                             order_book_message: OrderBookMessage = MexcOrderBook.diff_message_from_exchange(
-                                decoded_msg['data'], mexc_public.microseconds(),
+                                decoded_msg['data'], mexc_utils.microseconds(),
                                 metadata={"trading_pair": convert_from_exchange_trading_pair(trading_pair)}
                             )
                             output.put_nowait(order_book_message)
@@ -262,7 +261,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                             snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
                                 snapshot,
                                 trading_pair,
-                                timestamp=mexc_public.microseconds(),
+                                timestamp=mexc_utils.microseconds(),
                                 metadata={"trading_pair": trading_pair})
                             output.put_nowait(snapshot_msg)
                             self.logger().debug(f"Saved order book snapshot for {trading_pair}")
