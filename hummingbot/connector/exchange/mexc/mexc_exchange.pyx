@@ -315,7 +315,7 @@ cdef class MexcExchange(ExchangeBase):
         self._account_available_balances.clear()
         self._account_balances.clear()
         for k, balance in balances.items():
-            # if Decimal(balance['frozen']) + Decimal(balance['available']) > Decimal(0.001):
+            # if Decimal(balance['frozen']) + Decimal(balance['available']) > Decimal(0.0001):
             self._account_balances[k] = Decimal(balance['frozen']) + Decimal(balance['available'])
             self._account_available_balances[k] = Decimal(balance['available'])
 

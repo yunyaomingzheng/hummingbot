@@ -3,7 +3,6 @@
 import base64
 import hashlib
 import hmac
-import time
 from typing import (
     Any,
     Dict, Optional
