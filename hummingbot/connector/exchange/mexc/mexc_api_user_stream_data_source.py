@@ -17,7 +17,6 @@ from typing import (
     Any
 )
 
-from hummingbot.connector.exchange.mexc import mexc_utils
 from hummingbot.connector.exchange.mexc.constants import MEXC_WS_URL_PUBLIC
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
