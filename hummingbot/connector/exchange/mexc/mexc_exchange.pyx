@@ -58,7 +58,7 @@ from hummingbot.connector.exchange.mexc.constants import *
 
 from hummingbot.connector.exchange.mexc.mexc_utils import (
     convert_to_exchange_trading_pair,
-    convert_from_exchange_trading_pair, ws_order_status_convert_to_str, ssl_context
+    convert_from_exchange_trading_pair, ws_order_status_convert_to_str
 )
 
 from decimal import *
@@ -284,7 +284,6 @@ cdef class MexcExchange(ExchangeBase):
             headers=headers,
             # params=params if params else None, #mexc`s params  is already in the url
             data=text_data,
-            ssl_context=ssl_context
         )
 
         async with response_core as response:

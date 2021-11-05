@@ -7,10 +7,6 @@ from hummingbot.client.config.config_methods import using_exchange
 
 import time
 
-import ssl
-
-ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-
 
 def num_to_increment(num):
     return Decimal(10) ** -num

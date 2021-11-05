@@ -59,7 +59,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
         while True:
             try:
                 session = aiohttp.ClientSession()
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     params: Dict[str, Any] = {
