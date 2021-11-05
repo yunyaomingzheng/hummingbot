@@ -9,7 +9,7 @@ from typing import (
     Dict, Optional
 )
 
-from hummingbot.connector.exchange.mexc import mexc_public
+from hummingbot.connector.exchange.mexc import mexc_utils
 from urllib.parse import urlencode, unquote
 
 
@@ -21,7 +21,7 @@ class MexcAuth:
     def _sig(self, method, path, original_params=None):
         params = {
             'api_key': self.api_key,
-            'req_time': mexc_public.seconds()
+            'req_time': mexc_utils.seconds()
         }
         if original_params is not None:
             params.update(original_params)

@@ -5,7 +5,7 @@ MEXC_BASE_URL = "https://www.mexc.com"
 
 MEXC_SYMBOL_URL = '/open/api/v2/market/symbols'
 MEXC_TICKERS_URL = '/open/api/v2/market/ticker'
-MEXC_DEPTH_URL = '/open/api/v2/market/depth?symbol={trading_pair}&depth=200'  # Size=200 by default?
+MEXC_DEPTH_URL = '/open/api/v2/market/depth?symbol={trading_pair}&depth=200'
 MEXC_PRICE_URL = '/open/api/v2/market/ticker?symbol={trading_pair}'
 MEXC_PING_URL = '/open/api/v2/common/ping'
 

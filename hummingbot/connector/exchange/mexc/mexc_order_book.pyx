@@ -1,13 +1,10 @@
-from aiokafka import ConsumerRecord
-import bz2
+
 import logging
-from sqlalchemy.engine import RowProxy
 from typing import (
     Any,
     Optional,
     Dict
 )
-import ujson
 
 from hummingbot.connector.exchange.mexc.mexc_order_book_message import MexcOrderBookMessage
 from hummingbot.logger import HummingbotLogger
