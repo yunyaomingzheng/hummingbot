@@ -59,11 +59,11 @@ class MexcAuth:
         return signature
 
     def generate_ws_auth(self, operation: str):
-        timestamp = str(int(time.time()))
-
-        return {
-            "op": operation,  # sub key
-            "api_key": self.api_key,  #
-            "sign": self.get_signature(operation, timestamp),  #
-            "req_time": timestamp  #
-        }
+        # timestamp = str(int(time.time()))
+        # return {
+        #     "op": operation,  # sub key
+        #     "api_key": self.api_key,  #
+        #     "sign": self.get_signature(operation, timestamp),  #
+        #     "req_time": timestamp  #
+        # }
+        pass
