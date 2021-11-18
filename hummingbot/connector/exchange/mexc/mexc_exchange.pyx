@@ -899,12 +899,13 @@ cdef class MexcExchange(ExchangeBase):
                     for o in orders_by_trading_pair[trading_pair]:
                         if o.client_order_id == order_result_client_order_id:
                             result_bool = True if order_result_value == "invalid order state" or order_result_value == "success" else False
-                            cancellation_results.append(CancellationResult(o.exchange_order_id, result_bool))
+                            cancellation_results.append(CancellationResult(o.client_order_id, result_bool))
                             if result_bool:
                                 self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
                                                      OrderCancelledEvent(self._current_timestamp,
-                                                                         None,
+                                                                         order_id=o.client_order_id,
                                                                          exchange_order_id=o.exchange_order_id))
+                                self.c_stop_tracking_order(o.client_order_id)
 
             except Exception as ex:
 
@@ -913,8 +914,7 @@ cdef class MexcExchange(ExchangeBase):
                     exc_info=True,
                     app_warning_msg=f"Failed to cancel all orders on Mexc. Check API key and network connection."
                 )
-
-            return cancellation_results
+        return cancellation_results
 
     cdef OrderBook c_get_order_book(self, str trading_pair):
         cdef:
