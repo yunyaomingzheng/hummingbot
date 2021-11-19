@@ -9,10 +9,10 @@ connector_status = {
     'binance_perpetual_testnet': 'yellow',
     'binance_us': 'green',
     'bitfinex': 'yellow',
-    'bitmart': 'yellow',
+    'bitmart': 'green',
     'bittrex': 'yellow',
     'blocktane': 'yellow',
-    'bybit_perpetual': 'yellow',
+    'bybit_perpetual': 'green',
     'bybit_perpetual_testnet': 'yellow',
     'celo': 'yellow',
     'coinbase_pro': 'yellow',
@@ -57,5 +57,5 @@ def get_connector_status(connector_name: str) -> str:
     if connector_name not in connector_status.keys():
         status = "UNKNOWN"
     else:
-        return connector_status[connector_name].upper()
+        return f"&c{connector_status[connector_name].upper()}"
     return status

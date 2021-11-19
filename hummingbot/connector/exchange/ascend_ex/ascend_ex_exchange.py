@@ -121,6 +121,7 @@ class AscendExExchange(ExchangePyBase):
         self._order_not_found_records = {}  # Dict[client_order_id:str, count:int]
         self._trading_rules = {}  # Dict[trading_pair:str, AscendExTradingRule]
         self._status_polling_task = None
+        self._user_stream_tracker_task = None
         self._user_stream_event_listener_task = None
         self._trading_rules_polling_task = None
         self._last_poll_timestamp = 0
@@ -502,8 +503,10 @@ class AscendExExchange(ExchangePyBase):
             raise ValueError("Order amount must be greater than zero.")
         try:
             timestamp = ascend_ex_utils.get_ms_timestamp()
+            # Order UUID is strictly used to enable AscendEx to construct a unique(still questionable) exchange_order_id
+            order_uuid = f"{ascend_ex_utils.HBOT_BROKER_ID}-{ascend_ex_utils.uuid32()}"[:32]
             api_params = {
-                "id": order_id,
+                "id": order_uuid,
                 "time": timestamp,
                 "symbol": ascend_ex_utils.convert_to_exchange_trading_pair(trading_pair),
                 "orderPrice": f"{price:f}",

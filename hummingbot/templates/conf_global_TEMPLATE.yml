@@ -3,7 +3,7 @@
 #################################
 
 # For more detailed information: https://docs.hummingbot.io
-template_version: 26
+template_version: 29
 
 # Exchange configs
 
@@ -143,7 +143,11 @@ kill_switch_rate: null
 autofill_import: null
 
 # Paper Trading
-paper_trade_enabled: false
+paper_trade_exchanges: 
+  - binance
+  - kucoin
+  - ascend_ex
+  - gate_io
 paper_trade_account_balance:
   BTC: 1
   USDT: 1000
@@ -250,14 +254,31 @@ top-pane: "#000000"
 bottom-pane: "#000000"
 
 # Background color of the output pane
-output-pane: "#282C2F"
+output-pane: "#262626"
 
 # Background color of the input pane
-input-pane: "#151819"
+input-pane: "#1C1C1C"
 
 # Background color of the logs pane
-logs-pane: "#151819"
+logs-pane: "#121212"
 
 # Terminal primary color
-terminal-primary: "#00FFE5"
+terminal-primary: "#5FFFD7"
 
+# Primary label color
+primary-label: "#5FFFD7"
+
+# Secondary label color
+secondary-label: "#FFFFFF"
+
+# Success label color
+success-label: "#5FFFD7"
+
+# Warning label color
+warning-label: "#FFFF00"
+
+# Info label color
+info-label: "#5FD7FF"
+
+# Error label color
+error-label: "#FF0000"
