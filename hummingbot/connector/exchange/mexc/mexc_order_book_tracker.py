@@ -9,6 +9,7 @@ from typing import (
     Optional
 )
 
+import aiohttp
 from hummingbot.core.data_type.order_book import OrderBook
 from hummingbot.core.data_type.order_book_message import (
     OrderBookMessage,
@@ -30,8 +31,8 @@ class MexcOrderBookTracker(OrderBookTracker):
         return cls._mexcobt_logger
 
     def __init__(self,
-                 trading_pairs: Optional[List[str]] = None):
-        super().__init__(MexcAPIOrderBookDataSource(trading_pairs), trading_pairs)
+                 trading_pairs: Optional[List[str]] = None, shared_client: Optional[aiohttp.ClientSession] = None):
+        super().__init__(MexcAPIOrderBookDataSource(trading_pairs, shared_client=shared_client), trading_pairs)
         self._order_book_diff_stream: asyncio.Queue = asyncio.Queue()
         self._order_book_snapshot_stream: asyncio.Queue = asyncio.Queue()
         self._ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()

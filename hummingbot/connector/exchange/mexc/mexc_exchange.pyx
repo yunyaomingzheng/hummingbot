@@ -121,6 +121,7 @@ cdef class MexcExchange(ExchangeBase):
                  trading_required: bool = True):
 
         super().__init__()
+        self._shared_client = aiohttp.ClientSession()
         self._async_scheduler = AsyncCallScheduler(call_interval=0.5)
         self._data_source_type = order_book_tracker_data_source_type
         self._ev_loop = asyncio.get_event_loop()
@@ -128,17 +129,17 @@ cdef class MexcExchange(ExchangeBase):
         self._in_flight_orders = {}
         self._last_poll_timestamp = 0
         self._last_timestamp = 0
-        self._order_book_tracker = MexcOrderBookTracker(trading_pairs=trading_pairs)
+        self._order_book_tracker = MexcOrderBookTracker(trading_pairs=trading_pairs, shared_client=self._shared_client)
         self._poll_notifier = asyncio.Event()
         self._poll_interval = poll_interval
-        self._shared_client = None
         self._status_polling_task = None
         self._trading_required = trading_required
         self._trading_rules = {}
         self._trading_rules_polling_task = None
         self._tx_tracker = MexcExchangeTransactionTracker(self)
         self._user_stream_tracker = MexcUserStreamTracker(mexc_auth=self._mexc_auth,
-                                                          trading_pairs=trading_pairs)
+                                                          trading_pairs=trading_pairs,
+                                                          shared_client=self._shared_client)
 
     @property
     def name(self) -> str:

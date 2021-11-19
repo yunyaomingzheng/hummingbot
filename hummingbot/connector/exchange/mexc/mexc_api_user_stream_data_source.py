@@ -39,7 +39,9 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
         return cls._mexcausds_logger
 
-    def __init__(self, mexc_auth: MexcAuth, trading_pairs: Optional[List[str]] = []):
+    def __init__(self, mexc_auth: MexcAuth, trading_pairs: Optional[List[str]] = [],
+                 shared_client: Optional[aiohttp.ClientSession] = None):
+        self._shared_client = shared_client or self._get_session_instance()
         self._current_listen_key = None
         self._current_endpoint = None
         self._listen_for_user_stram_task = None
@@ -47,6 +49,11 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
         self._auth: MexcAuth = mexc_auth
         self._trading_pairs = trading_pairs
         super().__init__()
+
+    @classmethod
+    def _get_session_instance(cls) -> aiohttp.ClientSession:
+        session = aiohttp.ClientSession()
+        return session
 
     @property
     def last_recv_time(self) -> float:
@@ -58,7 +65,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
     async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
             try:
-                session = aiohttp.ClientSession()
+                session = self._shared_client
                 async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 

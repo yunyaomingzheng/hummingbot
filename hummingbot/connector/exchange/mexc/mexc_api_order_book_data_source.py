@@ -46,9 +46,15 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             cls._mexcaobds_logger = logging.getLogger(__name__)
         return cls._mexcaobds_logger
 
-    def __init__(self, trading_pairs: List[str]):
+    def __init__(self, trading_pairs: List[str], shared_client: Optional[aiohttp.ClientSession] = None):
         super().__init__(trading_pairs)
         self._trading_pairs: List[str] = trading_pairs
+        self._shared_client = shared_client or self._get_session_instance()
+
+    @classmethod
+    def _get_session_instance(cls) -> aiohttp.ClientSession:
+        session = aiohttp.ClientSession()
+        return session
 
     @staticmethod
     async def fetch_trading_pairs() -> List[str]:
@@ -70,37 +76,36 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return trading_pairs
 
     async def get_new_order_book(self, trading_pair: str) -> OrderBook:
-        async with aiohttp.ClientSession() as client:
-            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
+        snapshot: Dict[str, Any] = await self.get_snapshot(self._shared_client, trading_pair)
 
-            snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
-                snapshot,
-                trading_pair,
-                timestamp=mexc_utils.microseconds(),
-                metadata={"trading_pair": trading_pair})
-            order_book: OrderBook = self.order_book_create_function()
-            order_book.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
-            return order_book
+        snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
+            snapshot,
+            trading_pair,
+            timestamp=mexc_utils.microseconds(),
+            metadata={"trading_pair": trading_pair})
+        order_book: OrderBook = self.order_book_create_function()
+        order_book.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
+        return order_book
 
     @classmethod
-    async def get_last_traded_prices(cls, trading_pairs: List[str]) -> Dict[str, float]:
-        async with aiohttp.ClientSession() as client:
-            url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            async with client.get(url, ssl=mexc_utils.ssl_context) as products_response:
-                products_response: aiohttp.ClientResponse = products_response
-                if products_response.status != 200:
-                    raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
-                data = await products_response.json()
-                data = data['data']
-                all_markets: pd.DataFrame = pd.DataFrame.from_records(data=data)
-                all_markets.set_index("symbol", inplace=True)
+    async def get_last_traded_prices(cls, trading_pairs: List[str], shared_client: Optional[aiohttp.ClientSession] = None) -> Dict[str, float]:
+        client = shared_client or cls._get_session_instance()
+        url = MEXC_BASE_URL + MEXC_TICKERS_URL
+        async with client.get(url, ssl=mexc_utils.ssl_context) as products_response:
+            products_response: aiohttp.ClientResponse = products_response
+            if products_response.status != 200:
+                raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
+            data = await products_response.json()
+            data = data['data']
+            all_markets: pd.DataFrame = pd.DataFrame.from_records(data=data)
+            all_markets.set_index("symbol", inplace=True)
 
-                out: Dict[str, float] = {}
+            out: Dict[str, float] = {}
 
-                for trading_pair in trading_pairs:
-                    exchange_trading_pair = convert_to_exchange_trading_pair(trading_pair)
-                    out[trading_pair] = float(all_markets['last'][exchange_trading_pair])
-                return out
+            for trading_pair in trading_pairs:
+                exchange_trading_pair = convert_to_exchange_trading_pair(trading_pair)
+                out[trading_pair] = float(all_markets['last'][exchange_trading_pair])
+            return out
 
     async def get_trading_pairs(self) -> List[str]:
         if not self._trading_pairs:
@@ -140,7 +145,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         while True:
             try:
                 trading_pairs: List[str] = self._trading_pairs
-                session = aiohttp.ClientSession()
+                session = self._shared_client
                 async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
@@ -202,7 +207,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         while True:
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
-                session = aiohttp.ClientSession()
+                session = self._shared_client
                 async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
                     for trading_pair in trading_pairs:
@@ -254,27 +259,27 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         while True:
             try:
                 trading_pairs: List[str] = await self.get_trading_pairs()
-                async with aiohttp.ClientSession() as client:
-                    for trading_pair in trading_pairs:
-                        try:
-                            snapshot: Dict[str, Any] = await self.get_snapshot(client, trading_pair)
-                            snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
-                                snapshot,
-                                trading_pair,
-                                timestamp=mexc_utils.microseconds(),
-                                metadata={"trading_pair": trading_pair})
-                            output.put_nowait(snapshot_msg)
-                            self.logger().debug(f"Saved order book snapshot for {trading_pair}")
-                            await asyncio.sleep(5.0)
-                        except asyncio.CancelledError:
-                            raise
-                        except Exception as ex:
-                            self.logger().error("Unexpected error." + repr(ex), exc_info=True)
-                            await asyncio.sleep(5.0)
-                    this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
-                    next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
-                    delta: float = next_hour.timestamp() - time.time()
-                    await asyncio.sleep(delta)
+                session = self._shared_client
+                for trading_pair in trading_pairs:
+                    try:
+                        snapshot: Dict[str, Any] = await self.get_snapshot(session, trading_pair)
+                        snapshot_msg: OrderBookMessage = MexcOrderBook.snapshot_message_from_exchange(
+                            snapshot,
+                            trading_pair,
+                            timestamp=mexc_utils.microseconds(),
+                            metadata={"trading_pair": trading_pair})
+                        output.put_nowait(snapshot_msg)
+                        self.logger().debug(f"Saved order book snapshot for {trading_pair}")
+                        await asyncio.sleep(5.0)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as ex:
+                        self.logger().error("Unexpected error." + repr(ex), exc_info=True)
+                        await asyncio.sleep(5.0)
+                this_hour: pd.Timestamp = pd.Timestamp.utcnow().replace(minute=0, second=0, microsecond=0)
+                next_hour: pd.Timestamp = this_hour + pd.Timedelta(hours=1)
+                delta: float = next_hour.timestamp() - time.time()
+                await asyncio.sleep(delta)
             except asyncio.CancelledError:
                 raise
             except Exception as ex1:
