@@ -18,7 +18,7 @@ from typing import (
 )
 
 from hummingbot.connector.exchange.mexc import mexc_utils
-from hummingbot.connector.exchange.mexc.mexc_constants import MEXC_WS_URL_PUBLIC
+from hummingbot.connector.exchange.mexc import mexc_constants as CONSTANTS
 from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
@@ -27,7 +27,6 @@ from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 import time
 
 from websockets.exceptions import ConnectionClosed
-import hummingbot.connector.exchange.mexc.mexc_constants as CONSTANTS
 
 
 class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
@@ -69,7 +68,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
         while True:
             try:
                 session = self._shared_client
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087') as ws:
+                async with session.ws_connect(CONSTANTS.MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087') as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     params: Dict[str, Any] = {

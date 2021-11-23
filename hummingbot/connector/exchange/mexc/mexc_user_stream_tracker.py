@@ -50,7 +50,9 @@ class MexcUserStreamTracker(UserStreamTracker):
     @property
     def data_source(self) -> UserStreamTrackerDataSource:
         if not self._data_source:
-            self._data_source = MexcAPIUserStreamDataSource(throttler=self._throttler,mexc_auth=self._mexc_auth, trading_pairs=self._trading_pairs,
+            self._data_source = MexcAPIUserStreamDataSource(throttler=self._throttler,
+                                                            mexc_auth=self._mexc_auth,
+                                                            trading_pairs=self._trading_pairs,
                                                             shared_client=self._shared_client)
         return self._data_source
 

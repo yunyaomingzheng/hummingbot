@@ -2,7 +2,6 @@ import asyncio
 
 import aiohttp
 import logging
-import time
 from typing import (
     Any,
     AsyncIterable,
@@ -50,7 +49,7 @@ from hummingbot.connector.exchange_base import (
 )
 from hummingbot.connector.exchange.mexc.mexc_user_stream_tracker import MexcUserStreamTracker
 from hummingbot.core.utils.tracking_nonce import get_tracking_nonce
-from hummingbot.connector.exchange.mexc.mexc_constants import *
+from hummingbot.connector.exchange.mexc import mexc_constants as CONSTANTS
 
 from hummingbot.connector.exchange.mexc.mexc_utils import (
     convert_to_exchange_trading_pair,
@@ -58,7 +57,7 @@ from hummingbot.connector.exchange.mexc.mexc_utils import (
     convert_from_exchange_trading_pair, ws_order_status_convert_to_str, ssl_context
 )
 
-from decimal import *
+from decimal import Decimal
 
 hm_logger = None
 s_decimal_0 = Decimal(0)
@@ -82,7 +81,6 @@ class MexcAPIError(IOError):
 #         self._owner.c_did_timeout_tx(tx_id)
 
 class MexcExchange(ExchangeBase):
-
     MARKET_RECEIVED_ASSET_EVENT_TAG = MarketEvent.ReceivedAsset
     MARKET_BUY_ORDER_COMPLETED_EVENT_TAG = MarketEvent.BuyOrderCompleted
     MARKET_SELL_ORDER_COMPLETED_EVENT_TAG = MarketEvent.SellOrderCompleted
@@ -116,7 +114,7 @@ class MexcExchange(ExchangeBase):
                  trading_required: bool = True):
 
         super().__init__()
-        self._throttler = AsyncThrottler(RATE_LIMITS)
+        self._throttler = AsyncThrottler(CONSTANTS.RATE_LIMITS)
         self._shared_client = aiohttp.ClientSession()
         self._async_scheduler = AsyncCallScheduler(call_interval=0.5)
         self._data_source_type = order_book_tracker_data_source_type
@@ -125,18 +123,18 @@ class MexcExchange(ExchangeBase):
         self._in_flight_orders = {}
         self._last_poll_timestamp = 0
         self._last_timestamp = 0
-        self._order_book_tracker = MexcOrderBookTracker(throttler=self._throttler,trading_pairs=trading_pairs, shared_client=self._shared_client)
+        self._order_book_tracker = MexcOrderBookTracker(
+            throttler=self._throttler, trading_pairs=trading_pairs, shared_client=self._shared_client)
         self._poll_notifier = asyncio.Event()
         self._poll_interval = poll_interval
         self._status_polling_task = None
         self._trading_required = trading_required
         self._trading_rules = {}
         self._trading_rules_polling_task = None
-        self._user_stream_tracker = MexcUserStreamTracker(throttler=self._throttler,mexc_auth=self._mexc_auth,
+        self._user_stream_tracker = MexcUserStreamTracker(throttler=self._throttler,
+                                                          mexc_auth=self._mexc_auth,
                                                           trading_pairs=trading_pairs,
                                                           shared_client=self._shared_client)
-
-
         self._user_stream_tracker_task = None
         self._user_stream_event_listener_task = None
 
@@ -237,12 +235,12 @@ class MexcExchange(ExchangeBase):
 
     async def check_network(self) -> NetworkStatus:
         try:
-            resp = await self._api_request(method="GET", path_url=MEXC_PING_URL)
+            resp = await self._api_request(method="GET", path_url=CONSTANTS.MEXC_PING_URL)
             if 'code' not in resp or resp['code'] != 200:
                 raise Exception()
         except asyncio.CancelledError:
             raise
-        except Exception as ex:
+        except Exception:
             return NetworkStatus.NOT_CONNECTED
         return NetworkStatus.CONNECTED
 
@@ -251,7 +249,7 @@ class MexcExchange(ExchangeBase):
         Is called automatically by the clock for each clock's tick (1 second by default).
         It checks if status polling task is due for execution.
         """
-        now = time.time()
+        # now = time.time()
         poll_interval = self.MORE_SHORT_POLL_INTERVAL
         last_tick = int(self._last_timestamp / poll_interval)
         current_tick = int(timestamp / poll_interval)
@@ -278,7 +276,7 @@ class MexcExchange(ExchangeBase):
         text_data = ujson.dumps(data) if data else None
         limit_id = limit_id or path_url
         path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
-        url = urljoin(MEXC_BASE_URL, path_url)
+        url = urljoin(CONSTANTS.MEXC_BASE_URL, path_url)
         async with self._throttler.execute_task(limit_id):
             response_core = client.request(
                 method=method.upper(),
@@ -286,7 +284,7 @@ class MexcExchange(ExchangeBase):
                 headers=headers,
                 # params=params if params else None, #mexc`s params  is already in the url
                 data=text_data,
-                ssl_context=ssl_context,proxy='http://127.0.0.1:1087'
+                ssl_context=ssl_context, proxy='http://127.0.0.1:1087'
             )
 
         async with response_core as response:
@@ -299,7 +297,7 @@ class MexcExchange(ExchangeBase):
                 raise IOError(f"Error parsing data from {url}." + repr(ex))
 
     async def _update_balances(self):
-        path_url = MEXC_BALANCE_URL
+        path_url = CONSTANTS.MEXC_BALANCE_URL
         msg = await self._api_request("GET", path_url=path_url, is_auth_required=True)
         if msg['code'] == 200:
             balances = msg['data']
@@ -320,7 +318,7 @@ class MexcExchange(ExchangeBase):
             last_tick = int(self._last_timestamp / 60.0)
             current_tick = int(self.current_timestamp / 60.0)
             if current_tick > last_tick or len(self._trading_rules) < 1:
-                exchange_info = await self._api_request("GET", path_url=MEXC_SYMBOL_URL)
+                exchange_info = await self._api_request("GET", path_url=CONSTANTS.MEXC_SYMBOL_URL)
                 trading_rules_list = self._format_trading_rules(exchange_info['data'])
                 self._trading_rules.clear()
                 for trading_rule in trading_rules_list:
@@ -352,7 +350,7 @@ class MexcExchange(ExchangeBase):
     async def get_order_status(self, exchangge_order_id: str, trading_pair: str) -> Dict[str, Any]:
         params = {"order_ids": exchangge_order_id}
         msg = await self._api_request("GET",
-                                      path_url=MEXC_ORDER_DETAILS_URL,
+                                      path_url=CONSTANTS.MEXC_ORDER_DETAILS_URL,
                                       params=params,
                                       is_auth_required=True)
 
@@ -434,29 +432,29 @@ class MexcExchange(ExchangeBase):
                                 f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
                                 f"according to order delta restful API.")
                             self.trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
-                                                 BuyOrderCompletedEvent(self.current_timestamp,
-                                                                        tracked_order.client_order_id,
-                                                                        tracked_order.base_asset,
-                                                                        tracked_order.quote_asset,
-                                                                        tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                        tracked_order.executed_amount_base,
-                                                                        tracked_order.executed_amount_quote,
-                                                                        tracked_order.fee_paid,
-                                                                        tracked_order.order_type))
+                                               BuyOrderCompletedEvent(self.current_timestamp,
+                                                                      tracked_order.client_order_id,
+                                                                      tracked_order.base_asset,
+                                                                      tracked_order.quote_asset,
+                                                                      tracked_order.fee_asset or tracked_order.quote_asset,
+                                                                      tracked_order.executed_amount_base,
+                                                                      tracked_order.executed_amount_quote,
+                                                                      tracked_order.fee_paid,
+                                                                      tracked_order.order_type))
                         elif tracked_order.trade_type is TradeType.SELL:
                             self.logger().info(
                                 f"The SELL {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
                                 f"according to order delta restful API.")
                             self.trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
-                                                 SellOrderCompletedEvent(self.current_timestamp,
-                                                                         tracked_order.client_order_id,
-                                                                         tracked_order.base_asset,
-                                                                         tracked_order.quote_asset,
-                                                                         tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                         tracked_order.executed_amount_base,
-                                                                         tracked_order.executed_amount_quote,
-                                                                         tracked_order.fee_paid,
-                                                                         tracked_order.order_type))
+                                               SellOrderCompletedEvent(self.current_timestamp,
+                                                                       tracked_order.client_order_id,
+                                                                       tracked_order.base_asset,
+                                                                       tracked_order.quote_asset,
+                                                                       tracked_order.fee_asset or tracked_order.quote_asset,
+                                                                       tracked_order.executed_amount_base,
+                                                                       tracked_order.executed_amount_quote,
+                                                                       tracked_order.fee_paid,
+                                                                       tracked_order.order_type))
                         continue
                     if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
                         tracked_order.last_state = order_status
@@ -464,8 +462,8 @@ class MexcExchange(ExchangeBase):
                         self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
                                            f"according to order delta restful API.")
                         self.trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
-                                             OrderCancelledEvent(self.current_timestamp,
-                                                                 tracked_order.client_order_id))
+                                           OrderCancelledEvent(self.current_timestamp,
+                                                               tracked_order.client_order_id))
                 except Exception as ex:
                     self.logger().error("_update_order_status error ..." + repr(ex), exc_info=True)
 
@@ -515,31 +513,28 @@ class MexcExchange(ExchangeBase):
     async def _user_stream_event_listener(self):
         async for stream_message in self._iter_user_event_queue():
             try:
-
-                if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':  # reserved,not use
+                if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':
                     continue
-                elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':  # order status
+                elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':
                     client_order_id = stream_message["data"]["clientOrderId"]
-                    trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
-                    order_status = ws_order_status_convert_to_str(stream_message["data"]["status"])  # 1:NEW,2:FILLED,3:PARTIALLY_FILLED,4:CANCELED,5:PARTIALLY_CANCELED
-
+                    # trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
+                    # 1:NEW,2:FILLED,3:PARTIALLY_FILLED,4:CANCELED,5:PARTIALLY_CANCELED
+                    order_status = ws_order_status_convert_to_str(stream_message["data"]["status"])
                     tracked_order = self._in_flight_orders.get(client_order_id, None)
-
                     if tracked_order is None:
                         continue
-
                     # Update balance in time
                     await self._update_balances()
 
                     if order_status in {"FILLED", "PARTIALLY_FILLED"}:
-                        new_execute_amount_diff = s_decimal_0
                         executed_amount = Decimal(str(stream_message["data"]['quantity'])) - Decimal(
                             str(stream_message["data"]['remainQuantity']))
                         execute_price = Decimal(str(stream_message["data"]['price']))
                         execute_amount_diff = executed_amount - tracked_order.executed_amount_base
                         if execute_amount_diff > s_decimal_0:
                             tracked_order.executed_amount_base = executed_amount
-                            tracked_order.executed_amount_quote = Decimal(str(stream_message["data"]['amount'])) - Decimal(
+                            tracked_order.executed_amount_quote = Decimal(
+                                str(stream_message["data"]['amount'])) - Decimal(
                                 str(stream_message["data"]['remainAmount']))
 
                             current_fee = self.get_fee(tracked_order.base_asset,
@@ -551,15 +546,15 @@ class MexcExchange(ExchangeBase):
 
                             self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of ")
                             self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG,
-                                                 OrderFilledEvent(self.current_timestamp,
-                                                                  tracked_order.client_order_id,
-                                                                  tracked_order.trading_pair,
-                                                                  tracked_order.trade_type,
-                                                                  tracked_order.order_type,
-                                                                  execute_price,
-                                                                  execute_amount_diff,
-                                                                  current_fee,
-                                                                  exchange_trade_id=tracked_order.exchange_order_id))
+                                               OrderFilledEvent(self.current_timestamp,
+                                                                tracked_order.client_order_id,
+                                                                tracked_order.trading_pair,
+                                                                tracked_order.trade_type,
+                                                                tracked_order.order_type,
+                                                                execute_price,
+                                                                execute_amount_diff,
+                                                                current_fee,
+                                                                exchange_trade_id=tracked_order.exchange_order_id))
                     if order_status == "FILLED":
                         fee_paid = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
                         tracked_order.fee_paid = fee_paid
@@ -569,29 +564,29 @@ class MexcExchange(ExchangeBase):
                                 f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
                                 f"according to order delta websocket API.")
                             self.trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
-                                                 BuyOrderCompletedEvent(self.current_timestamp,
-                                                                        tracked_order.client_order_id,
-                                                                        tracked_order.base_asset,
-                                                                        tracked_order.quote_asset,
-                                                                        tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                        tracked_order.executed_amount_base,
-                                                                        tracked_order.executed_amount_quote,
-                                                                        tracked_order.fee_paid,
-                                                                        tracked_order.order_type))
+                                               BuyOrderCompletedEvent(self.current_timestamp,
+                                                                      tracked_order.client_order_id,
+                                                                      tracked_order.base_asset,
+                                                                      tracked_order.quote_asset,
+                                                                      tracked_order.fee_asset or tracked_order.quote_asset,
+                                                                      tracked_order.executed_amount_base,
+                                                                      tracked_order.executed_amount_quote,
+                                                                      tracked_order.fee_paid,
+                                                                      tracked_order.order_type))
                         elif tracked_order.trade_type is TradeType.SELL:
                             self.logger().info(
                                 f"The SELL {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
                                 f"according to order delta websocket API.")
                             self.trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
-                                                 SellOrderCompletedEvent(self.current_timestamp,
-                                                                         tracked_order.client_order_id,
-                                                                         tracked_order.base_asset,
-                                                                         tracked_order.quote_asset,
-                                                                         tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                         tracked_order.executed_amount_base,
-                                                                         tracked_order.executed_amount_quote,
-                                                                         tracked_order.fee_paid,
-                                                                         tracked_order.order_type))
+                                               SellOrderCompletedEvent(self.current_timestamp,
+                                                                       tracked_order.client_order_id,
+                                                                       tracked_order.base_asset,
+                                                                       tracked_order.quote_asset,
+                                                                       tracked_order.fee_asset or tracked_order.quote_asset,
+                                                                       tracked_order.executed_amount_base,
+                                                                       tracked_order.executed_amount_quote,
+                                                                       tracked_order.fee_paid,
+                                                                       tracked_order.order_type))
                         self.stop_tracking_order(tracked_order.client_order_id)
                         continue
 
@@ -600,8 +595,8 @@ class MexcExchange(ExchangeBase):
                         self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
                                            f"according to order delta websocket API.")
                         self.trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
-                                             OrderCancelledEvent(self.current_timestamp,
-                                                                 tracked_order.client_order_id))
+                                           OrderCancelledEvent(self.current_timestamp,
+                                                               tracked_order.client_order_id))
                         self.stop_tracking_order(tracked_order.client_order_id)
 
                 else:
@@ -651,7 +646,7 @@ class MexcExchange(ExchangeBase):
 
         exchange_order_id = await self._api_request(
             "POST",
-            path_url=MEXC_PLACE_ORDER,
+            path_url=CONSTANTS.MEXC_PLACE_ORDER,
             params={},
             data=data,
             is_auth_required=True
@@ -670,14 +665,14 @@ class MexcExchange(ExchangeBase):
 
         if not order_type.is_limit_type():
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
             raise Exception(f"Unsupported order type: {order_type}")
 
         decimal_price = self.quantize_order_price(trading_pair, price)
         decimal_amount = self.quantize_order_amount(trading_pair, amount, decimal_price)
         if decimal_price * decimal_amount < trading_rule.min_notional_size:
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
             raise ValueError(f"Buy order amount {decimal_amount} is lower than the notional size ")
         try:
             exchange_order_id = await self.place_order(order_id, trading_pair, decimal_amount, True, order_type,
@@ -696,14 +691,14 @@ class MexcExchange(ExchangeBase):
                 self.logger().info(
                     f"Created {order_type.name.upper()} buy order {order_id} for {decimal_amount} {trading_pair}.")
             self.trigger_event(self.MARKET_BUY_ORDER_CREATED_EVENT_TAG,
-                                 BuyOrderCreatedEvent(
-                                     self.current_timestamp,
-                                     order_type,
-                                     trading_pair,
-                                     decimal_amount,
-                                     decimal_price,
-                                     order_id
-                                 ))
+                               BuyOrderCreatedEvent(
+                                   self.current_timestamp,
+                                   order_type,
+                                   trading_pair,
+                                   decimal_amount,
+                                   decimal_price,
+                                   order_id
+                               ))
         except asyncio.CancelledError:
             raise
         except Exception as ex:
@@ -719,7 +714,7 @@ class MexcExchange(ExchangeBase):
                 app_warning_msg="Failed to submit buy order to Mexc. Check API key and network connection."
             )
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
 
     def buy(self, trading_pair: str, amount: Decimal, order_type=OrderType.MARKET,
             price: Decimal = s_decimal_NaN, **kwargs) -> str:
@@ -739,7 +734,7 @@ class MexcExchange(ExchangeBase):
 
         if not order_type.is_limit_type():
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
             raise Exception(f"Unsupported order type: {order_type}")
 
         decimal_price = self.quantize_order_price(trading_pair, price)
@@ -747,7 +742,7 @@ class MexcExchange(ExchangeBase):
 
         if decimal_price * decimal_amount < trading_rule.min_notional_size:
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
             raise ValueError(f"Sell order amount {decimal_amount} is lower than the notional size ")
 
         try:
@@ -767,14 +762,14 @@ class MexcExchange(ExchangeBase):
                 self.logger().info(
                     f"Created {order_type.name.upper()} sell order {order_id} for {decimal_amount} {trading_pair}.")
             self.trigger_event(self.MARKET_SELL_ORDER_CREATED_EVENT_TAG,
-                                 SellOrderCreatedEvent(
-                                     self.current_timestamp,
-                                     order_type,
-                                     trading_pair,
-                                     decimal_amount,
-                                     decimal_price,
-                                     order_id
-                                 ))
+                               SellOrderCreatedEvent(
+                                   self.current_timestamp,
+                                   order_type,
+                                   trading_pair,
+                                   decimal_amount,
+                                   decimal_price,
+                                   order_id
+                               ))
         except asyncio.CancelledError:
             raise
         except Exception as ex:
@@ -789,7 +784,7 @@ class MexcExchange(ExchangeBase):
                 app_warning_msg=f"Failed to submit sell order to Mexc. Check API key and network connection."
             )
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
-                                 MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
+                               MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
 
     def sell(self, trading_pair: str, amount: Decimal, order_type: OrderType = OrderType.MARKET,
              price: Decimal = s_decimal_NaN, **kwargs) -> str:
@@ -810,7 +805,7 @@ class MexcExchange(ExchangeBase):
             params = {
                 "client_order_ids": client_order_id,
             }
-            response = await self._api_request("DELETE", path_url=MEXC_ORDER_CANCEL, params=params,
+            response = await self._api_request("DELETE", path_url=CONSTANTS.MEXC_ORDER_CANCEL, params=params,
                                                is_auth_required=True)
 
             if not response['code'] == 200:
@@ -849,7 +844,7 @@ class MexcExchange(ExchangeBase):
             try:
                 cancel_all_results = await self._api_request(
                     "DELETE",
-                    path_url=MEXC_ORDER_CANCEL,
+                    path_url=CONSTANTS.MEXC_ORDER_CANCEL,
                     params=params,
                     is_auth_required=True
                 )
@@ -861,9 +856,9 @@ class MexcExchange(ExchangeBase):
                             cancellation_results.append(CancellationResult(o.client_order_id, result_bool))
                             if result_bool:
                                 self.trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
-                                                     OrderCancelledEvent(self.current_timestamp,
-                                                                         order_id=o.client_order_id,
-                                                                         exchange_order_id=o.exchange_order_id))
+                                                   OrderCancelledEvent(self.current_timestamp,
+                                                                       order_id=o.client_order_id,
+                                                                       exchange_order_id=o.exchange_order_id))
                                 self.stop_tracking_order(o.client_order_id)
 
             except Exception as ex:
@@ -918,7 +913,7 @@ class MexcExchange(ExchangeBase):
         trading_rule = self._trading_rules[trading_pair]
         return Decimal(trading_rule.min_base_amount_increment)
 
-    def quantize_order_amount(self, trading_pair: str, amount: Decimal,price: Decimal=s_decimal_0) -> Decimal:
+    def quantize_order_amount(self, trading_pair: str, amount: Decimal, price: Decimal = s_decimal_0) -> Decimal:
 
         trading_rule = self._trading_rules[trading_pair]
 
@@ -948,7 +943,7 @@ class MexcExchange(ExchangeBase):
         params = {
             'order_id': order_id,
         }
-        msg = await self._api_request("GET", path_url=MEXC_DEAL_DETAIL, params=params, is_auth_required=True)
+        msg = await self._api_request("GET", path_url=CONSTANTS.MEXC_DEAL_DETAIL, params=params, is_auth_required=True)
         fee = s_decimal_0
         if msg['code'] == 200:
             balances = msg['data']

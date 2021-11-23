@@ -14,6 +14,7 @@ from hummingbot.core.data_type.order_book_message import OrderBookMessage, Order
 
 _logger = None
 
+
 class MexcOrderBook(OrderBook):
     @classmethod
     def logger(cls) -> HummingbotLogger:

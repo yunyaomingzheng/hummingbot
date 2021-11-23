@@ -32,6 +32,7 @@ class MexcInFlightOrder(InFlightOrderBase):
             amount,
             initial_state  # submitted, partial-filled, cancelling, filled, canceled, partial-canceled
         )
+        self.fee_asset = self.base_asset if self.trade_type is TradeType.BUY else self.quote_asset
 
     @property
     def is_done(self) -> bool:
@@ -48,6 +49,9 @@ class MexcInFlightOrder(InFlightOrderBase):
     @property
     def is_open(self) -> bool:
         return self.last_state in {"NEW", "PARTIALLY_FILLED"}
+
+    def mark_as_filled(self):
+        self.last_state = "FILLED"
 
     @classmethod
     def from_json(cls, data: Dict[str, Any]) -> InFlightOrderBase:

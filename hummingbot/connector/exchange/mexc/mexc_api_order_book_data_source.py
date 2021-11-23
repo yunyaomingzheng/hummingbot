@@ -9,12 +9,10 @@ import pandas as pd
 import time
 from typing import (
     Any,
-    AsyncIterable,
     Dict,
     List,
     Optional,
 )
-from websockets.exceptions import ConnectionClosed
 
 from hummingbot.connector.exchange.mexc.mexc_utils import (
     convert_from_exchange_trading_pair,
@@ -27,16 +25,12 @@ from hummingbot.core.data_type.order_book import OrderBook
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_order_book import MexcOrderBook
-from hummingbot.connector.exchange.mexc.mexc_constants import (
-    MEXC_SYMBOL_URL,
-    MEXC_DEPTH_URL,
-    MEXC_TICKERS_URL,
-    MEXC_WS_URL_PUBLIC, MEXC_BASE_URL, RATE_LIMITS, EXCHANGE_NAME
-)
+from hummingbot.connector.exchange.mexc import mexc_constants as CONSTANTS
 from dateutil.parser import parse as dateparse
 from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 from hummingbot.connector.exchange.mexc.mexc_websocket_adaptor import MexcWebSocketAdaptor
 from collections import defaultdict
+
 
 class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     MESSAGE_TIMEOUT = 120.0
@@ -67,15 +61,15 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     @classmethod
     def _get_throttler_instance(cls) -> AsyncThrottler:
-        throttler = AsyncThrottler(RATE_LIMITS)
+        throttler = AsyncThrottler(CONSTANTS.RATE_LIMITS)
         return throttler
 
     @staticmethod
     async def fetch_trading_pairs() -> List[str]:
         async with aiohttp.ClientSession() as client:
             throttler = MexcAPIOrderBookDataSource._get_throttler_instance()
-            async with throttler.execute_task(MEXC_SYMBOL_URL):
-                url = MEXC_BASE_URL + MEXC_SYMBOL_URL
+            async with throttler.execute_task(CONSTANTS.MEXC_SYMBOL_URL):
+                url = CONSTANTS.MEXC_BASE_URL + CONSTANTS.MEXC_SYMBOL_URL
                 async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as products_response:
 
                     products_response: aiohttp.ClientResponse = products_response
@@ -107,9 +101,9 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_last_traded_prices(cls, trading_pairs: List[str], throttler: Optional[AsyncThrottler] = None, shared_client: Optional[aiohttp.ClientSession] = None) -> Dict[str, float]:
         client = shared_client or cls._get_session_instance()
         throttler = throttler or cls._get_throttler_instance()
-        async with throttler.execute_task(MEXC_TICKERS_URL):
-            url = MEXC_BASE_URL + MEXC_TICKERS_URL
-            async with client.get(url, ssl=ssl_context,proxy='http://127.0.0.1:1087') as products_response:
+        async with throttler.execute_task(CONSTANTS.MEXC_TICKERS_URL):
+            url = CONSTANTS.MEXC_BASE_URL + CONSTANTS.MEXC_TICKERS_URL
+            async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     # raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -143,11 +137,11 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
     @staticmethod
     async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str, throttler: Optional[AsyncThrottler] = None) -> Dict[str, Any]:
         throttler = throttler or MexcAPIOrderBookDataSource._get_throttler_instance()
-        async with throttler.execute_task(MEXC_DEPTH_URL):
+        async with throttler.execute_task(CONSTANTS.MEXC_DEPTH_URL):
             trading_pair = convert_to_exchange_trading_pair(trading_pair)
-            tick_url = MEXC_DEPTH_URL.format(trading_pair=trading_pair)
-            url = MEXC_BASE_URL + tick_url
-            async with client.get(url, ssl=ssl_context,proxy='http://127.0.0.1:1087') as response:
+            tick_url = CONSTANTS.MEXC_DEPTH_URL.format(trading_pair=trading_pair)
+            url = CONSTANTS.MEXC_BASE_URL + tick_url
+            async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as response:
                 response: aiohttp.ClientResponse = response
                 if response.status != 200:
                     raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
@@ -167,13 +161,13 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         Initialize WebSocket client for UserStreamDataSource
         """
         try:
-            ws = MexcWebSocketAdaptor(throttler=self._throttler,shared_client=self._shared_client)
+            ws = MexcWebSocketAdaptor(throttler=self._throttler, shared_client=self._shared_client)
             await ws.connect()
             return ws
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            self.logger().network(f"Unexpected error occured connecting to {EXCHANGE_NAME} WebSocket API. "
+            self.logger().network(f"Unexpected error occured connecting to {CONSTANTS.EXCHANGE_NAME} WebSocket API. "
                                   f"({e})")
             raise
 
