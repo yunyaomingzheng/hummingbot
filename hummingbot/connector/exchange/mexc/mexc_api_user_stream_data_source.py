@@ -18,7 +18,8 @@ from typing import (
 )
 
 from hummingbot.connector.exchange.mexc import mexc_utils
-from hummingbot.connector.exchange.mexc.constants import MEXC_WS_URL_PUBLIC
+from hummingbot.connector.exchange.mexc.mexc_constants import MEXC_WS_URL_PUBLIC
+from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.logger import HummingbotLogger
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
@@ -26,28 +27,30 @@ from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 import time
 
 from websockets.exceptions import ConnectionClosed
+import hummingbot.connector.exchange.mexc.mexc_constants as CONSTANTS
 
 
 class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
-    _mexcausds_logger: Optional[HummingbotLogger] = None
+    _logger: Optional[HummingbotLogger] = None
     MESSAGE_TIMEOUT = 300.0
 
     @classmethod
     def logger(cls) -> HummingbotLogger:
-        if cls._mexcausds_logger is None:
-            cls._mexcausds_logger = logging.getLogger(__name__)
+        if cls._logger is None:
+            cls._logger = logging.getLogger(__name__)
 
-        return cls._mexcausds_logger
+        return cls._logger
 
-    def __init__(self, mexc_auth: MexcAuth, trading_pairs: Optional[List[str]] = [],
+    def __init__(self, throttler: AsyncThrottler, mexc_auth: MexcAuth, trading_pairs: Optional[List[str]] = [],
                  shared_client: Optional[aiohttp.ClientSession] = None):
         self._shared_client = shared_client or self._get_session_instance()
-        self._current_listen_key = None
-        self._current_endpoint = None
-        self._listen_for_user_stram_task = None
+        # self._current_listen_key = None
+        # self._current_endpoint = None
+        # self._listen_for_user_stram_task = None
         self._last_recv_time: float = 0
         self._auth: MexcAuth = mexc_auth
         self._trading_pairs = trading_pairs
+        self._throttler = throttler
         super().__init__()
 
     @classmethod
@@ -66,7 +69,7 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
         while True:
             try:
                 session = self._shared_client
-                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context) as ws:
+                async with session.ws_connect(MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087') as ws:
                     ws: aiohttp.client_ws.ClientWebSocketResponse = ws
 
                     params: Dict[str, Any] = {
@@ -79,18 +82,18 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                     sign_data = hashlib.md5(params_sign.encode()).hexdigest()
                     del params['api_secret']
                     params["sign"] = sign_data
+                    async with self._throttler.execute_task(CONSTANTS.MEXC_WS_URL_PUBLIC):
+                        await ws.send_str(json.dumps(params))
 
-                    await ws.send_str(json.dumps(params))
-
-                    async for raw_msg in self._inner_messages(ws):
-                        self._last_recv_time = time.time()
-                        decoded_msg: dict = raw_msg
-                        if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':
-                            output.put_nowait(decoded_msg)
-                        elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'sub.personal':
-                            pass
-                        else:
-                            self.logger().debug(f"other message received from MEXC websocket: {decoded_msg}")
+                        async for raw_msg in self._inner_messages(ws):
+                            self._last_recv_time = time.time()
+                            decoded_msg: dict = raw_msg
+                            if 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'push.personal.order':
+                                output.put_nowait(decoded_msg)
+                            elif 'channel' in decoded_msg.keys() and decoded_msg['channel'] == 'sub.personal':
+                                pass
+                            else:
+                                self.logger().debug(f"other message received from MEXC websocket: {decoded_msg}")
 
             except asyncio.CancelledError:
                 raise
