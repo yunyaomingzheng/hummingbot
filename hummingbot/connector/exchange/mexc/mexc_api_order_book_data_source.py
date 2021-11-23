@@ -42,7 +42,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                  shared_client: Optional[aiohttp.ClientSession] = None,
                  throttler: Optional[AsyncThrottler] = None,):
         super().__init__(trading_pairs)
-        print(f"******trading_pairs测试初始化是是不是已经有交易对{trading_pairs}")
         self._trading_pairs: List[str] = trading_pairs
         self._throttler = throttler or self._get_throttler_instance()
         self._shared_client = shared_client or self._get_session_instance()
@@ -121,7 +120,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 return out
 
     async def get_trading_pairs(self) -> List[str]:
-        print("调用了get_trading_pairs")
         if not self._trading_pairs:
             try:
                 self._trading_pairs = await self.fetch_trading_pairs()
@@ -184,7 +182,6 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     if 'channel' in decoded_msg.keys() and decoded_msg['channel'] in MexcWebSocketAdaptor.SUBSCRIPTION_LIST:
                         self._message_queue[decoded_msg['channel']].put_nowait(decoded_msg)
                     else:
-                        print("***********", f"Unrecognized message received from MEXC websocket: {decoded_msg}")
                         self.logger().debug(f"Unrecognized message received from MEXC websocket: {decoded_msg}")
             except asyncio.CancelledError:
                 raise

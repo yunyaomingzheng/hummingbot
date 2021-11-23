@@ -22,7 +22,6 @@ class MexcOrderBookMessage(OrderBookMessage):
             *args,
             **kwargs,
     ):
-        print("打印数据测试生生世世生生世世生生世世生生世世",content)
         if timestamp is None:
             if message_type is OrderBookMessageType.SNAPSHOT:
                 raise ValueError("timestamp must not be None when initializing snapshot messages.")
