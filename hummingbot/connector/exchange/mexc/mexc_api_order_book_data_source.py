@@ -40,7 +40,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     def __init__(self, trading_pairs: List[str],
                  shared_client: Optional[aiohttp.ClientSession] = None,
-                 throttler: Optional[AsyncThrottler] = None,):
+                 throttler: Optional[AsyncThrottler] = None, ):
         super().__init__(trading_pairs)
         self._trading_pairs: List[str] = trading_pairs
         self._throttler = throttler or self._get_throttler_instance()
@@ -97,7 +97,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return order_book
 
     @classmethod
-    async def get_last_traded_prices(cls, trading_pairs: List[str], throttler: Optional[AsyncThrottler] = None, shared_client: Optional[aiohttp.ClientSession] = None) -> Dict[str, float]:
+    async def get_last_traded_prices(cls, trading_pairs: List[str], throttler: Optional[AsyncThrottler] = None,
+                                     shared_client: Optional[aiohttp.ClientSession] = None) -> Dict[str, float]:
         client = shared_client or cls._get_session_instance()
         throttler = throttler or cls._get_throttler_instance()
         async with throttler.execute_task(CONSTANTS.MEXC_TICKERS_URL):
@@ -133,7 +134,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return self._trading_pairs
 
     @staticmethod
-    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str, throttler: Optional[AsyncThrottler] = None) -> Dict[str, Any]:
+    async def get_snapshot(client: aiohttp.ClientSession, trading_pair: str,
+                           throttler: Optional[AsyncThrottler] = None) -> Dict[str, Any]:
         throttler = throttler or MexcAPIOrderBookDataSource._get_throttler_instance()
         async with throttler.execute_task(CONSTANTS.MEXC_DEPTH_URL):
             trading_pair = convert_to_exchange_trading_pair(trading_pair)
@@ -144,8 +146,11 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 if response.status != 200:
                     raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
                                   f"HTTP status is {response.status}.")
-                api_data = await response.read()
-                data: Dict[str, Any] = json.loads(api_data)['data']
+                # api_data = await response.read()
+                api_data = await response.json()
+                # print('测试get_snapshot:', api_data, ',json:', api_json_data)
+                # data: Dict[str, Any] = json.loads(api_data)['data']
+                data = api_data['data']
                 data['ts'] = microseconds()
 
                 return data
@@ -179,7 +184,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 async for msg in ws.iter_messages():
                     decoded_msg: dict = msg
 
-                    if 'channel' in decoded_msg.keys() and decoded_msg['channel'] in MexcWebSocketAdaptor.SUBSCRIPTION_LIST:
+                    if 'channel' in decoded_msg.keys() and decoded_msg[
+                        'channel'] in MexcWebSocketAdaptor.SUBSCRIPTION_LIST:
                         self._message_queue[decoded_msg['channel']].put_nowait(decoded_msg)
                     else:
                         self.logger().debug(f"Unrecognized message received from MEXC websocket: {decoded_msg}")
