@@ -80,7 +80,7 @@ class MexcWebSocketAdaptor:
     async def send_request(self, payload: Dict[str, Any]):
         await self._websocket.send_json(payload)
 
-    async def send_request_str(self, payload: Dict[str, Any]):
+    async def send_request_str(self, payload: str):
         await self._websocket.send_str(payload)
 
     async def subscribe_to_order_book_streams(self, trading_pairs: List[str]):
@@ -167,7 +167,7 @@ class MexcWebSocketAdaptor:
 
     # disconnect from exchange
     async def disconnect(self):
-        print("websocket调用结束")
+        # print("websocket调用结束")
         if self._websocket is None:
             return
         await self._websocket.close()

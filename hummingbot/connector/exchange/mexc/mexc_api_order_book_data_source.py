@@ -198,7 +198,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 )
                 await self._sleep(5.0)
             finally:
-                print("调用websocket关闭1")
+                # print("调用websocket关闭1")
                 ws and await ws.disconnect()
 
     async def listen_for_trades(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
@@ -247,6 +247,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                     decoded_msg['data'], microseconds(),
                     metadata={"trading_pair": convert_from_exchange_trading_pair(decoded_msg['symbol'])}
                 )
+                # print(f"测试order_book_message:{order_book_message}")
                 output.put_nowait(order_book_message)
 
             except asyncio.CancelledError:
@@ -269,6 +270,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                             trading_pair,
                             timestamp=microseconds(),
                             metadata={"trading_pair": trading_pair})
+                        # print(f"测试snapshot_msg:{snapshot_msg}")
                         output.put_nowait(snapshot_msg)
                         self.logger().debug(f"Saved order book snapshot for {trading_pair}")
                         await asyncio.sleep(5.0)
