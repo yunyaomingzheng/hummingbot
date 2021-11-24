@@ -423,8 +423,10 @@ class MexcExchange(ExchangeBase):
                                            f"order {tracked_order.client_order_id}.")
                         self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG, order_filled_event)
                     if order_status == "FILLED":
-                        fee_paid = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
+                        fee_paid, fee_currency = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
+                        print(f"测试_update_order_status{fee_paid},exchange_order_id{tracked_order.exchange_order_id}")
                         tracked_order.fee_paid = fee_paid
+                        tracked_order.fee_asset = fee_currency
                         tracked_order.last_state = order_status
                         self.stop_tracking_order(tracked_order.client_order_id)
                         if tracked_order.trade_type is TradeType.BUY:
@@ -516,89 +518,7 @@ class MexcExchange(ExchangeBase):
                 if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':
                     continue
                 elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':
-                    client_order_id = stream_message["data"]["clientOrderId"]
-                    # trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
-                    # 1:NEW,2:FILLED,3:PARTIALLY_FILLED,4:CANCELED,5:PARTIALLY_CANCELED
-                    order_status = ws_order_status_convert_to_str(stream_message["data"]["status"])
-                    tracked_order = self._in_flight_orders.get(client_order_id, None)
-                    if tracked_order is None:
-                        continue
-                    # Update balance in time
-                    await self._update_balances()
-
-                    if order_status in {"FILLED", "PARTIALLY_FILLED"}:
-                        executed_amount = Decimal(str(stream_message["data"]['quantity'])) - Decimal(
-                            str(stream_message["data"]['remainQuantity']))
-                        execute_price = Decimal(str(stream_message["data"]['price']))
-                        execute_amount_diff = executed_amount - tracked_order.executed_amount_base
-                        if execute_amount_diff > s_decimal_0:
-                            tracked_order.executed_amount_base = executed_amount
-                            tracked_order.executed_amount_quote = Decimal(
-                                str(stream_message["data"]['amount'])) - Decimal(
-                                str(stream_message["data"]['remainAmount']))
-
-                            current_fee = self.get_fee(tracked_order.base_asset,
-                                                       tracked_order.quote_asset,
-                                                       tracked_order.order_type,
-                                                       tracked_order.trade_type,
-                                                       execute_amount_diff,
-                                                       execute_price)
-
-                            self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of ")
-                            self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG,
-                                               OrderFilledEvent(self.current_timestamp,
-                                                                tracked_order.client_order_id,
-                                                                tracked_order.trading_pair,
-                                                                tracked_order.trade_type,
-                                                                tracked_order.order_type,
-                                                                execute_price,
-                                                                execute_amount_diff,
-                                                                current_fee,
-                                                                exchange_trade_id=tracked_order.exchange_order_id))
-                    if order_status == "FILLED":
-                        fee_paid = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
-                        tracked_order.fee_paid = fee_paid
-                        tracked_order.last_state = order_status
-                        if tracked_order.trade_type is TradeType.BUY:
-                            self.logger().info(
-                                f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
-                                f"according to order delta websocket API.")
-                            self.trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
-                                               BuyOrderCompletedEvent(self.current_timestamp,
-                                                                      tracked_order.client_order_id,
-                                                                      tracked_order.base_asset,
-                                                                      tracked_order.quote_asset,
-                                                                      tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                      tracked_order.executed_amount_base,
-                                                                      tracked_order.executed_amount_quote,
-                                                                      tracked_order.fee_paid,
-                                                                      tracked_order.order_type))
-                        elif tracked_order.trade_type is TradeType.SELL:
-                            self.logger().info(
-                                f"The SELL {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
-                                f"according to order delta websocket API.")
-                            self.trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
-                                               SellOrderCompletedEvent(self.current_timestamp,
-                                                                       tracked_order.client_order_id,
-                                                                       tracked_order.base_asset,
-                                                                       tracked_order.quote_asset,
-                                                                       tracked_order.fee_asset or tracked_order.quote_asset,
-                                                                       tracked_order.executed_amount_base,
-                                                                       tracked_order.executed_amount_quote,
-                                                                       tracked_order.fee_paid,
-                                                                       tracked_order.order_type))
-                        self.stop_tracking_order(tracked_order.client_order_id)
-                        continue
-
-                    if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
-                        tracked_order.last_state = order_status
-                        self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
-                                           f"according to order delta websocket API.")
-                        self.trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
-                                           OrderCancelledEvent(self.current_timestamp,
-                                                               tracked_order.client_order_id))
-                        self.stop_tracking_order(tracked_order.client_order_id)
-
+                    await self._process_order_message(stream_message)
                 else:
                     continue
             except asyncio.CancelledError:
@@ -606,6 +526,93 @@ class MexcExchange(ExchangeBase):
             except Exception as e:
                 self.logger().error(f"Unexpected error in user stream listener lopp. {e}", exc_info=True)
                 await asyncio.sleep(5.0)
+
+    async def _process_order_message(self, stream_message: Dict[str, Any]):
+        client_order_id = stream_message["data"]["clientOrderId"]
+        # trading_pair = convert_from_exchange_trading_pair(stream_message["symbol"])
+        # 1:NEW,2:FILLED,3:PARTIALLY_FILLED,4:CANCELED,5:PARTIALLY_CANCELED
+        order_status = ws_order_status_convert_to_str(stream_message["data"]["status"])
+        tracked_order = self._in_flight_orders.get(client_order_id, None)
+        if tracked_order is None:
+            return
+        # Update balance in time
+        await self._update_balances()
+
+        if order_status in {"FILLED", "PARTIALLY_FILLED"}:
+            executed_amount = Decimal(str(stream_message["data"]['quantity'])) - Decimal(
+                str(stream_message["data"]['remainQuantity']))
+            execute_price = Decimal(str(stream_message["data"]['price']))
+            execute_amount_diff = executed_amount - tracked_order.executed_amount_base
+            if execute_amount_diff > s_decimal_0:
+                tracked_order.executed_amount_base = executed_amount
+                tracked_order.executed_amount_quote = Decimal(
+                    str(stream_message["data"]['amount'])) - Decimal(
+                    str(stream_message["data"]['remainAmount']))
+
+                current_fee = self.get_fee(tracked_order.base_asset,
+                                           tracked_order.quote_asset,
+                                           tracked_order.order_type,
+                                           tracked_order.trade_type,
+                                           execute_amount_diff,
+                                           execute_price)
+                print(f"_process_order_message,current_fee:{current_fee}")
+                self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of ")
+                self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG,
+                                   OrderFilledEvent(self.current_timestamp,
+                                                    tracked_order.client_order_id,
+                                                    tracked_order.trading_pair,
+                                                    tracked_order.trade_type,
+                                                    tracked_order.order_type,
+                                                    execute_price,
+                                                    execute_amount_diff,
+                                                    current_fee,
+                                                    exchange_trade_id=tracked_order.exchange_order_id))
+        if order_status == "FILLED":
+            fee_paid, fee_currency = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
+            print(f"测试_process_order_message:{fee_paid},fee_currency:{fee_currency},exchange_order_id:{tracked_order.exchange_order_id}")
+            print(f"base_asset:{tracked_order.base_asset},quote_asset:{tracked_order.quote_asset},fee_asset:{tracked_order.fee_asset}")
+            tracked_order.fee_paid = fee_paid
+            tracked_order.fee_asset = fee_currency
+            tracked_order.last_state = order_status
+            if tracked_order.trade_type is TradeType.BUY:
+                self.logger().info(
+                    f"The BUY {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
+                    f"according to order delta websocket API.")
+                self.trigger_event(self.MARKET_BUY_ORDER_COMPLETED_EVENT_TAG,
+                                   BuyOrderCompletedEvent(self.current_timestamp,
+                                                          tracked_order.client_order_id,
+                                                          tracked_order.base_asset,
+                                                          tracked_order.quote_asset,
+                                                          tracked_order.fee_asset or tracked_order.quote_asset,
+                                                          tracked_order.executed_amount_base,
+                                                          tracked_order.executed_amount_quote,
+                                                          tracked_order.fee_paid,
+                                                          tracked_order.order_type))
+            elif tracked_order.trade_type is TradeType.SELL:
+                self.logger().info(
+                    f"The SELL {tracked_order.order_type} order {tracked_order.client_order_id} has completed "
+                    f"according to order delta websocket API.")
+                self.trigger_event(self.MARKET_SELL_ORDER_COMPLETED_EVENT_TAG,
+                                   SellOrderCompletedEvent(self.current_timestamp,
+                                                           tracked_order.client_order_id,
+                                                           tracked_order.base_asset,
+                                                           tracked_order.quote_asset,
+                                                           tracked_order.fee_asset or tracked_order.quote_asset,
+                                                           tracked_order.executed_amount_base,
+                                                           tracked_order.executed_amount_quote,
+                                                           tracked_order.fee_paid,
+                                                           tracked_order.order_type))
+            self.stop_tracking_order(tracked_order.client_order_id)
+            return
+
+        if order_status == "CANCELED" or order_status == "PARTIALLY_CANCELED":
+            tracked_order.last_state = order_status
+            self.logger().info(f"Order {tracked_order.client_order_id} has been cancelled "
+                               f"according to order delta websocket API.")
+            self.trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
+                               OrderCancelledEvent(self.current_timestamp,
+                                                   tracked_order.client_order_id))
+            self.stop_tracking_order(tracked_order.client_order_id)
 
     @property
     def status_dict(self) -> Dict[str, bool]:
@@ -945,10 +952,12 @@ class MexcExchange(ExchangeBase):
         }
         msg = await self._api_request("GET", path_url=CONSTANTS.MEXC_DEAL_DETAIL, params=params, is_auth_required=True)
         fee = s_decimal_0
+        fee_currency = None
         if msg['code'] == 200:
             balances = msg['data']
         else:
             raise Exception(msg)
         for order in balances:
             fee += Decimal(order['fee'])
-        return fee
+            fee_currency = order['fee_currency']
+        return fee, fee_currency

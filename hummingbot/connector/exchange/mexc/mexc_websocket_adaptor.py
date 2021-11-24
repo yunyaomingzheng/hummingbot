@@ -167,6 +167,7 @@ class MexcWebSocketAdaptor:
 
     # disconnect from exchange
     async def disconnect(self):
+        print("websocket调用结束")
         if self._websocket is None:
             return
         await self._websocket.close()
@@ -175,7 +176,10 @@ class MexcWebSocketAdaptor:
         try:
             while True:
                 try:
-                    msg: str = await asyncio.wait_for(self._websocket.receive_json(), timeout=self.MESSAGE_TIMEOUT)
+                    msg = await asyncio.wait_for(self._websocket.receive_json(), timeout=self.MESSAGE_TIMEOUT)
+                    if msg is None:
+                        self.logger().info(f"msg is None.")
+                        continue
                     yield msg
                 except asyncio.TimeoutError:
                     pong_waiter = self._websocket.ping()
@@ -183,5 +187,6 @@ class MexcWebSocketAdaptor:
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except ConnectionError:
             return
-        finally:
-            await self.disconnect()
+        # finally:
+            # print("调用websocket关闭2")
+            # await self.disconnect()

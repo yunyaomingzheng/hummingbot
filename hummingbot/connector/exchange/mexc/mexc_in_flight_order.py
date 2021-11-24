@@ -32,7 +32,7 @@ class MexcInFlightOrder(InFlightOrderBase):
             amount,
             initial_state  # submitted, partial-filled, cancelling, filled, canceled, partial-canceled
         )
-        self.fee_asset = self.base_asset if self.trade_type is TradeType.BUY else self.quote_asset
+        self.fee_asset = self.quote_asset
 
     @property
     def is_done(self) -> bool:

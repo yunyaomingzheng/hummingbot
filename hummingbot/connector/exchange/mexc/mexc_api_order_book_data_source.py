@@ -192,6 +192,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 )
                 await self._sleep(5.0)
             finally:
+                print("调用websocket关闭1")
                 ws and await ws.disconnect()
 
     async def listen_for_trades(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
