@@ -74,9 +74,6 @@ class MexcWebSocketAdaptor:
             self._shared_client = aiohttp.ClientSession()
         return self._shared_client
 
-    async def _sleep(self, delay: float = 1.0):
-        await asyncio.sleep(delay)
-
     async def send_request(self, payload: Dict[str, Any]):
         await self._websocket.send_json(payload)
 
@@ -176,11 +173,10 @@ class MexcWebSocketAdaptor:
         try:
             while True:
                 try:
-                    msg = await asyncio.wait_for(self._websocket.receive_json(), timeout=self.MESSAGE_TIMEOUT)
-                    if msg is None:
-                        self.logger().info(f"msg is None.")
-                        continue
-                    yield msg
+                    msg = await asyncio.wait_for(self._websocket.receive(), timeout=self.MESSAGE_TIMEOUT)
+                    if msg.type == aiohttp.WSMsgType.CLOSED:
+                        raise ConnectionError
+                    yield json.loads(msg.data)
                 except asyncio.TimeoutError:
                     pong_waiter = self._websocket.ping()
                     self.logger().warning("WebSocket receive_json timeout ...")

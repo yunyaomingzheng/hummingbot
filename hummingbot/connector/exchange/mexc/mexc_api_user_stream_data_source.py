@@ -66,11 +66,11 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
 
     async def listen_for_user_stream(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
+            session = self._shared_client
             try:
-                session = self._shared_client
-                async with session.ws_connect(CONSTANTS.MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087') as ws:
-                    ws: aiohttp.client_ws.ClientWebSocketResponse = ws
-
+                ws = await session.ws_connect(CONSTANTS.MEXC_WS_URL_PUBLIC, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087')
+                ws: aiohttp.client_ws.ClientWebSocketResponse = ws
+                try:
                     params: Dict[str, Any] = {
                         'api_key': self._auth.api_key,
                         "op": "sub.personal",
@@ -93,6 +93,10 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                                 pass
                             else:
                                 self.logger().debug(f"other message received from MEXC websocket: {decoded_msg}")
+                except Exception as ex2:
+                    raise ex2
+                finally:
+                    await ws.close()
 
             except asyncio.CancelledError:
                 raise
@@ -100,18 +104,22 @@ class MexcAPIUserStreamDataSource(UserStreamTrackerDataSource):
                 self.logger().error("Unexpected error with WebSocket connection ,Retrying after 30 seconds..." + str(ex),
                                     exc_info=True)
                 await asyncio.sleep(30.0)
-            finally:
-                await session.close()
+            # finally:
+                # await session.close()
 
     async def _inner_messages(self,
                               ws: aiohttp.ClientWebSocketResponse) -> AsyncIterable[str]:
         try:
             while True:
-                msg: str = await asyncio.wait_for(ws.receive_json(), timeout=self.MESSAGE_TIMEOUT)
-                yield msg
+                msg = await asyncio.wait_for(ws.receive(), timeout=self.MESSAGE_TIMEOUT)
+                if msg.type == aiohttp.WSMsgType.CLOSED:
+                    raise ConnectionError
+                yield json.loads(msg.data)
         except asyncio.TimeoutError:
             return
         except ConnectionClosed:
             return
-        finally:
-            await ws.close()
+        except ConnectionError:
+            return
+        # finally:
+        #     await ws.close()

@@ -291,7 +291,7 @@ class MexcExchange(ExchangeBase):
             if response.status != 200:
                 raise IOError(f"Error request from {url}. Response: {await response.json()}.")
             try:
-                parsed_response = await response.json()
+                parsed_response = await response.json(encoding='utf-8')
                 return parsed_response
             except Exception as ex:
                 raise IOError(f"Error parsing data from {url}." + repr(ex))
@@ -424,7 +424,6 @@ class MexcExchange(ExchangeBase):
                         self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG, order_filled_event)
                     if order_status == "FILLED":
                         fee_paid, fee_currency = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
-                        print(f"测试_update_order_status{fee_paid},exchange_order_id{tracked_order.exchange_order_id}")
                         tracked_order.fee_paid = fee_paid
                         tracked_order.fee_asset = fee_currency
                         tracked_order.last_state = order_status
@@ -555,7 +554,7 @@ class MexcExchange(ExchangeBase):
                                            tracked_order.trade_type,
                                            execute_amount_diff,
                                            execute_price)
-                print(f"_process_order_message,current_fee:{current_fee}")
+                # print(f"_process_order_message,current_fee:{current_fee}")
                 self.logger().info(f"Filled {execute_amount_diff} out of {tracked_order.amount} of ")
                 self.trigger_event(self.MARKET_ORDER_FILLED_EVENT_TAG,
                                    OrderFilledEvent(self.current_timestamp,
@@ -569,8 +568,8 @@ class MexcExchange(ExchangeBase):
                                                     exchange_trade_id=tracked_order.exchange_order_id))
         if order_status == "FILLED":
             fee_paid, fee_currency = await self.get_deal_detail_fee(tracked_order.exchange_order_id)
-            print(f"测试_process_order_message:{fee_paid},fee_currency:{fee_currency},exchange_order_id:{tracked_order.exchange_order_id}")
-            print(f"base_asset:{tracked_order.base_asset},quote_asset:{tracked_order.quote_asset},fee_asset:{tracked_order.fee_asset}")
+            # print(f"测试_process_order_message:{fee_paid},fee_currency:{fee_currency},exchange_order_id:{tracked_order.exchange_order_id}")
+            # print(f"base_asset:{tracked_order.base_asset},quote_asset:{tracked_order.quote_asset},fee_asset:{tracked_order.fee_asset}")
             tracked_order.fee_paid = fee_paid
             tracked_order.fee_asset = fee_currency
             tracked_order.last_state = order_status
