@@ -73,7 +73,8 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
                     products_response: aiohttp.ClientResponse = products_response
                     if products_response.status != 200:
-                        raise IOError(f"Error fetching active MEXC. HTTP status is {products_response.status}.")
+                        return []
+                        # raise IOError(f"Error fetching active MEXC. HTTP status is {products_response.status}.")
 
                     data = await products_response.json()
                     data = data['data']
