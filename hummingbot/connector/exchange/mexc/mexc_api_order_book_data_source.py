@@ -144,9 +144,10 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             url = CONSTANTS.MEXC_BASE_URL + tick_url
             async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as response:
                 response: aiohttp.ClientResponse = response
-                if response.status != 200:
+                status = response.status
+                if status != 200:
                     raise IOError(f"Error fetching MEXC market snapshot for {trading_pair}. "
-                                  f"HTTP status is {response.status}.")
+                                  f"HTTP status is {status}.")
                 # api_data = await response.read()
                 api_data = await response.json()
                 # print('测试get_snapshot:', api_data, ',json:', api_json_data)
