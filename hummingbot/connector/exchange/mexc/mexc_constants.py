@@ -22,12 +22,13 @@ MEXC_DEAL_DETAIL = '/open/api/v2/order/deal_detail'
 # WS
 MEXC_WS_URL_PUBLIC = 'wss://wbs.mexc.com/raw/ws'
 
-MINUTE = 60
+MINUTE = 1
+SECOND_MINUTE = 2
 HTTP_ENDPOINTS_LIMIT_ID = "AllHTTP"
-HTTP_LIMIT = 600
+HTTP_LIMIT = 20
 WS_AUTH_LIMIT_ID = "AllWsAuth"
 WS_ENDPOINTS_LIMIT_ID = "AllWs"
-WS_LIMIT = 500
+WS_LIMIT = 20
 
 RATE_LIMITS = [
     RateLimit(
@@ -39,7 +40,7 @@ RATE_LIMITS = [
     RateLimit(
         limit_id=MEXC_SYMBOL_URL,
         limit=HTTP_LIMIT,
-        time_interval=MINUTE,
+        time_interval=SECOND_MINUTE,
         linked_limits=[LinkedLimitWeightPair(HTTP_ENDPOINTS_LIMIT_ID)],
     ),
     RateLimit(

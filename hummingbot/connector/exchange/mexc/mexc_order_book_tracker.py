@@ -49,11 +49,9 @@ class MexcOrderBookTracker(OrderBookTracker):
 
     def start(self):
         super().start()
-        # print("#################")
         self._order_book_stream_listener_task = safe_ensure_future(self._data_source.listen_for_subscriptions())
 
     def stop(self):
-        # print("$$$$$$$$$$$$$$$$$$$$$$$$$")
         if self._order_book_stream_listener_task:
             self._order_book_stream_listener_task.cancel()
         super().stop()

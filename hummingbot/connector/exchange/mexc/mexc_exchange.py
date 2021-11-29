@@ -278,7 +278,7 @@ class MexcExchange(ExchangeBase):
         path_url = self._mexc_auth.add_auth_to_params(method, path_url, params, is_auth_required)
         url = urljoin(CONSTANTS.MEXC_BASE_URL, path_url)
         async with self._throttler.execute_task(limit_id):
-            response_core = client.request(
+            response_core = await client.request(
                 method=method.upper(),
                 url=url,
                 headers=headers,
@@ -287,14 +287,14 @@ class MexcExchange(ExchangeBase):
                 ssl_context=ssl_context, proxy='http://127.0.0.1:1087'
             )
 
-        async with response_core as response:
-            if response.status != 200:
-                raise IOError(f"Error request from {url}. Response: {await response.json()}.")
-            try:
-                parsed_response = await response.json(encoding='utf-8')
-                return parsed_response
-            except Exception as ex:
-                raise IOError(f"Error parsing data from {url}." + repr(ex))
+        # async with response_core as response:
+        if response_core.status != 200:
+            raise IOError(f"Error request from {url}. Response: {await response_core.json()}.")
+        try:
+            parsed_response = await response_core.json()
+            return parsed_response
+        except Exception as ex:
+            raise IOError(f"Error parsing data from {url}." + repr(ex))
 
     async def _update_balances(self):
         path_url = CONSTANTS.MEXC_BALANCE_URL
@@ -513,13 +513,14 @@ class MexcExchange(ExchangeBase):
 
     async def _user_stream_event_listener(self):
         async for stream_message in self._iter_user_event_queue():
+            # self.logger().info(f"stream_message:{stream_message}")
             try:
                 if 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.account':
                     continue
                 elif 'channel' in stream_message.keys() and stream_message['channel'] == 'push.personal.order':
                     await self._process_order_message(stream_message)
                 else:
-                    continue
+                    self.logger().debug(f"Unknown event received from the connector ({stream_message})")
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -950,6 +951,7 @@ class MexcExchange(ExchangeBase):
             'order_id': order_id,
         }
         msg = await self._api_request("GET", path_url=CONSTANTS.MEXC_DEAL_DETAIL, params=params, is_auth_required=True)
+        # print(f"msg:{msg}")
         fee = s_decimal_0
         fee_currency = None
         if msg['code'] == 200:
