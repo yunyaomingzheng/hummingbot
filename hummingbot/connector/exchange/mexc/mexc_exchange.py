@@ -288,11 +288,10 @@ class MexcExchange(ExchangeBase):
             )
 
         # async with response_core as response:
-        response = await response_core
-        if response.status != 200:
-            raise IOError(f"Error request from {url}. Response: {await response.json()}.")
+        if response_core.status != 200:
+            raise IOError(f"Error request from {url}. Response: {await response_core.json()}.")
         try:
-            parsed_response = await response.json()
+            parsed_response = await response_core.json()
             return parsed_response
         except Exception as ex:
             raise IOError(f"Error parsing data from {url}." + repr(ex))
