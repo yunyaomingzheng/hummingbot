@@ -2,8 +2,6 @@
 import aiohttp
 import aiohttp.client_ws
 import asyncio
-
-import json
 import logging
 import pandas as pd
 import time
@@ -186,8 +184,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 async for msg in ws.iter_messages():
                     decoded_msg: dict = msg
 
-                    if 'channel' in decoded_msg.keys() and decoded_msg[
-                        'channel'] in MexcWebSocketAdaptor.SUBSCRIPTION_LIST:
+                    if 'channel' in decoded_msg.keys() and decoded_msg['channel'] in MexcWebSocketAdaptor.SUBSCRIPTION_LIST:
                         self._message_queue[decoded_msg['channel']].put_nowait(decoded_msg)
                     else:
                         self.logger().debug(f"Unrecognized message received from MEXC websocket: {decoded_msg}")
