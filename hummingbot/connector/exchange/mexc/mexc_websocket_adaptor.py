@@ -18,11 +18,11 @@ from hummingbot.logger import HummingbotLogger
 
 class MexcWebSocketAdaptor:
 
-    AUTH_REQUEST = "public/auth"
-    PING_METHOD = "public/heartbeat"
-    PONG_METHOD = "public/respond-heartbeat"
-    HEARTBEAT_INTERVAL = 15.0
-    ONE_SEC_DELAY = 1.0
+    # AUTH_REQUEST = "public/auth"
+    # PING_METHOD = "public/heartbeat"
+    # PONG_METHOD = "public/respond-heartbeat"
+    # HEARTBEAT_INTERVAL = 15.0
+    # ONE_SEC_DELAY = 1.0
 
     DEAL_CHANNEL_ID = "push.deal"
     DEPTH_CHANNEL_ID = "push.depth"
@@ -32,12 +32,12 @@ class MexcWebSocketAdaptor:
     _METHOD_FIELD_NAME = "method"
     _NONCE_FIELD_NAME = "nonce"
     _PARAMS_FIELD_NAME = "params"
-    _SIGNATURE_FIELD_NAME = "sig"
-    _API_KEY_FIELD_NAME = "api_key"
+    # _SIGNATURE_FIELD_NAME = "sig"
+    # _API_KEY_FIELD_NAME = "api_key"
 
-    _SUBSCRIPTION_OPERATION = "subscribe"
-    _CHANNEL_PARAMS = "channels"
-    _USER_CHANNEL_LIST = ["user.order", "user.trade", "user.balance"]
+    # _SUBSCRIPTION_OPERATION = "subscribe"
+    # _CHANNEL_PARAMS = "channels"
+    # _USER_CHANNEL_LIST = ["user.order", "user.trade", "user.balance"]
 
     _logger: Optional[HummingbotLogger] = None
 
@@ -164,7 +164,6 @@ class MexcWebSocketAdaptor:
 
     # disconnect from exchange
     async def disconnect(self):
-        # print("websocket调用结束")
         if self._websocket is None:
             return
         await self._websocket.close()
@@ -183,6 +182,4 @@ class MexcWebSocketAdaptor:
                     await asyncio.wait_for(pong_waiter, timeout=self.PING_TIMEOUT)
         except ConnectionError:
             return
-        # finally:
-            # print("调用websocket关闭2")
-            # await self.disconnect()
+
