@@ -106,22 +106,23 @@ class MexcWebSocketAdaptor:
             raise
 
     async def subscribe_to_user_streams(self):
-        try:
-            channels = self._USER_CHANNEL_LIST
-            subscription_payload = {
-                self._ID_FIELD_NAME: get_tracking_nonce(),
-                self._METHOD_FIELD_NAME: self._SUBSCRIPTION_OPERATION,
-                self._PARAMS_FIELD_NAME: {self._CHANNEL_PARAMS: channels},
-            }
-            await self.send_request(subscription_payload)
-
-            self.logger().info("Successfully subscribed to user stream...")
-
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self.logger().error("Unexpected error occurred subscribing to user streams...", exc_info=True)
-            raise
+        pass
+        # try:
+        #     channels = self._USER_CHANNEL_LIST
+        #     subscription_payload = {
+        #         self._ID_FIELD_NAME: get_tracking_nonce(),
+        #         self._METHOD_FIELD_NAME: self._SUBSCRIPTION_OPERATION,
+        #         self._PARAMS_FIELD_NAME: {self._CHANNEL_PARAMS: channels},
+        #     }
+        #     await self.send_request(subscription_payload)
+        #
+        #     self.logger().info("Successfully subscribed to user stream...")
+        #
+        # except asyncio.CancelledError:
+        #     raise
+        # except Exception:
+        #     self.logger().error("Unexpected error occurred subscribing to user streams...", exc_info=True)
+        #     raise
 
     async def authenticate(self):
         pass
