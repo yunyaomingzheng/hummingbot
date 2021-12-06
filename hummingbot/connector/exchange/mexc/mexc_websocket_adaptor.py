@@ -12,7 +12,6 @@ from typing import Dict, Optional, AsyncIterable, Any, List
 
 from hummingbot.connector.exchange.mexc.mexc_auth import MexcAuth
 from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
-from hummingbot.core.utils.tracking_nonce import get_tracking_nonce
 from hummingbot.logger import HummingbotLogger
 
 
