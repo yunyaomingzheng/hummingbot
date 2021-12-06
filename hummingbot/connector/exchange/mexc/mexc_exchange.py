@@ -69,17 +69,6 @@ class MexcAPIError(IOError):
         self.error_payload = error_payload
 
 
-# class MexcExchangeTransactionTracker(TransactionTracker):
-#     _owner = MexcExchange()
-#
-#     def __init__(self, owner: MexcExchange):
-#         super().__init__()
-#         self._owner = owner
-#
-#     def c_did_timeout_tx(self,  tx_id):
-#         TransactionTracker.c_did_timeout_tx(self, tx_id)
-#         self._owner.c_did_timeout_tx(tx_id)
-
 class MexcExchange(ExchangeBase):
     MARKET_RECEIVED_ASSET_EVENT_TAG = MarketEvent.ReceivedAsset
     MARKET_BUY_ORDER_COMPLETED_EVENT_TAG = MarketEvent.BuyOrderCompleted
