@@ -96,7 +96,7 @@ class MexcWebSocketAdaptor:
     async def connect(self):
         try:
             self._websocket = await self.get_shared_client().ws_connect(
-                url=self._WS_URL, ssl_context=mexc_utils.ssl_context, proxy='http://127.0.0.1:1087')
+                url=self._WS_URL, ssl_context=mexc_utils.ssl_context)
 
         except Exception as e:
             self.logger().error(f"Websocket error: '{str(e)}'", exc_info=True)

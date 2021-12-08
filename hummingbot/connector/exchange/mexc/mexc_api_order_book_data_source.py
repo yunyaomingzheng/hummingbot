@@ -67,7 +67,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             throttler = MexcAPIOrderBookDataSource._get_throttler_instance()
             async with throttler.execute_task(CONSTANTS.MEXC_SYMBOL_URL):
                 url = CONSTANTS.MEXC_BASE_URL + CONSTANTS.MEXC_SYMBOL_URL
-                async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as products_response:
+                async with client.get(url, ssl=ssl_context) as products_response:
 
                     products_response: aiohttp.ClientResponse = products_response
                     if products_response.status != 200:
@@ -102,7 +102,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
         throttler = throttler or cls._get_throttler_instance()
         async with throttler.execute_task(CONSTANTS.MEXC_TICKERS_URL):
             url = CONSTANTS.MEXC_BASE_URL + CONSTANTS.MEXC_TICKERS_URL
-            async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as products_response:
+            async with client.get(url, ssl=ssl_context) as products_response:
                 products_response: aiohttp.ClientResponse = products_response
                 if products_response.status != 200:
                     # raise IOError(f"Error get tickers from MEXC markets. HTTP status is {products_response.status}.")
@@ -140,7 +140,7 @@ class MexcAPIOrderBookDataSource(OrderBookTrackerDataSource):
             trading_pair = convert_to_exchange_trading_pair(trading_pair)
             tick_url = CONSTANTS.MEXC_DEPTH_URL.format(trading_pair=trading_pair)
             url = CONSTANTS.MEXC_BASE_URL + tick_url
-            async with client.get(url, ssl=ssl_context, proxy='http://127.0.0.1:1087') as response:
+            async with client.get(url, ssl=ssl_context) as response:
                 response: aiohttp.ClientResponse = response
                 status = response.status
                 if status != 200:
