@@ -114,8 +114,7 @@ class MexcAPIOrderBookDataSourceUnitTests(unittest.TestCase):
         self.mocking_assistant.add_http_response(mock_api, 100, mock_response)
 
         with self.assertRaises(IOError) as context:
-            self.async_run_with_timeout(self.data_source.get_snapshot(self.data_source._shared_client,
-                                                                          self.trading_pair))
+            self.async_run_with_timeout(self.data_source.get_snapshot(self.data_source._shared_client, self.trading_pair))
 
         self.assertEqual(str(context.exception),
                          f'Error fetching MEXC market snapshot for {self.trading_pair.replace("-", "_")}. '
