@@ -317,7 +317,7 @@ class MexcExchange(ExchangeBase):
                 for trading_rule in trading_rules_list:
                     self._trading_rules[trading_rule.trading_pair] = trading_rule
         except Exception as ex:
-            self.logger().error(f"Error _update_trading_rules:" + str(ex), exc_info=True)
+            self.logger().error("Error _update_trading_rules:" + str(ex), exc_info=True)
 
     def _format_trading_rules(self, raw_trading_pair_info: List[Dict[str, Any]]) -> List[TradingRule]:
         trading_rules = []
@@ -781,7 +781,7 @@ class MexcExchange(ExchangeBase):
                 f"{decimal_price if order_type is OrderType.LIMIT else ''}."
                 f"{decimal_price}." + ",ex:" + repr(ex),
                 exc_info=True,
-                app_warning_msg=f"Failed to submit sell order to Mexc. Check API key and network connection."
+                app_warning_msg="Failed to submit sell order to Mexc. Check API key and network connection."
             )
             self.trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
                                MarketOrderFailureEvent(self.current_timestamp, order_id, order_type))
@@ -844,7 +844,8 @@ class MexcExchange(ExchangeBase):
                 else:
                     this_turn_cancel_order_ids = cancel_order_ids
                     is_need_loop = False
-                self.logger().debug(f"cancel_order_ids {this_turn_cancel_order_ids} orders_by_trading_pair[trading_pair]")
+                self.logger().debug(
+                    f"cancel_order_ids {this_turn_cancel_order_ids} orders_by_trading_pair[trading_pair]")
                 params = {
                     'order_ids': quote(','.join([o for o in this_turn_cancel_order_ids])),
                 }
