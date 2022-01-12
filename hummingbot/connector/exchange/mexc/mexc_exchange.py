@@ -308,14 +308,11 @@ class MexcExchange(ExchangeBase):
 
     async def _update_trading_rules(self):
         try:
-            last_tick = int(self._last_timestamp / 60.0)
-            current_tick = int(self.current_timestamp / 60.0)
-            if current_tick > last_tick or len(self._trading_rules) < 1:
-                exchange_info = await self._api_request("GET", path_url=CONSTANTS.MEXC_SYMBOL_URL)
-                trading_rules_list = self._format_trading_rules(exchange_info['data'])
-                self._trading_rules.clear()
-                for trading_rule in trading_rules_list:
-                    self._trading_rules[trading_rule.trading_pair] = trading_rule
+            exchange_info = await self._api_request("GET", path_url=CONSTANTS.MEXC_SYMBOL_URL)
+            trading_rules_list = self._format_trading_rules(exchange_info['data'])
+            self._trading_rules.clear()
+            for trading_rule in trading_rules_list:
+                self._trading_rules[trading_rule.trading_pair] = trading_rule
         except Exception as ex:
             self.logger().error("Error _update_trading_rules:" + str(ex), exc_info=True)
 
@@ -876,7 +873,7 @@ class MexcExchange(ExchangeBase):
                     self.logger().network(
                         f"Failed to cancel all orders: {this_turn_cancel_order_ids}" + repr(ex),
                         exc_info=True,
-                        app_warning_msg=f"Failed to cancel all orders on Mexc. Check API key and network connection."
+                        app_warning_msg="Failed to cancel all orders on Mexc. Check API key and network connection."
                     )
         return cancellation_results
 
